@@ -73,7 +73,7 @@ const statuses = {
   "action": "broadcast",
   "options":{},
   "payload":{
-    "edge": "[this edge node address]"
+    "edge": "[this edge node address]",
     "subscription":{
       "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
       "time": 1518248991817,
