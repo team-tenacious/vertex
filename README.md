@@ -1,6 +1,8 @@
 # muster
 Muster of sockets ...
 
+<img src="https://user-images.githubusercontent.com/1958406/36060561-d8e2c56e-0e54-11e8-918b-12875682ec16.png"></img>
+
 # statuses
 ```javascript
 const statuses = {
