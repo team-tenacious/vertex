@@ -1,9 +1,68 @@
 # muster
-Muster of sockets ...
+Muster of sockets is pulling your strings...
 
+# premise
+
+## cluster first
+This is a cluster-first pub-sub solution - so not meant for single instance use, the idea is that we build clustering in from the ground up instead of warping a single-process design to cluster.
+
+## topology
+
+### top level entities:
+1. client - the client of the cluster, can login, publish and subscribe.
+2. edge node - a cluster member that holds client connections, and forwards subscribe and publish requests into the cluster.
+3. search node - a cluster member that looks up subscriptions and forwards to relevant edge nodes, the search node also branches the publish address into wildcard permutations and uses the hash-ring to forward to other search nodes.
+
+NB: edge nodes can also be search nodes
+
+## subscriptions are costly, publication work is distributed
+all servers in the cluster have access to the full subscription list, each new subscription results in a cluster wide broadcast, the idea here is that subscriptions happen less often than publish operations. Publish operations on the other hand go through an edge node (one that holds client connections and sessions) - this node uses a hash-ring to direct the message to an internal cluster node that finds all the edge nodes that house subscribers that want to see the message and forward the message to them. 
+
+## why the hash-ring?
+What is nice about using the hash-ring instead of random or round robin (which could become a config setting later) - is that each node will hold an LRU cache for commonly published to addresses, if a hash-ring is used to logically arrange search requests across the cluster, each cluster node's LRU cache will be less fragmented, if subscription addresses are very random, the hash-ring will distribute requests randomly - so a nice balance.
+
+## about wildcards
+On publish, the publish addresses are branched into the original address, ie: "/test/1/2" and into the additional wildcard options: "/test/1/*", "/test/*/*", "/*/*/*" - this is done by the search node (not the edge node) - which forwards these search requests to other search nodes identified by the hash ring. These can now be looked up by a key/value store of they are not available in the LRU cache of the search nodes, ie: redis?
+
+NB: this does mean that / and * are special characters and that /1/* is not the same as /1/*/2
+
+## about subscription lookups
+
+Subscriptions are in a tree structure, with 3 levels:
+
+1. address - the actual subscription path, ie: "/test/1/2"
+2. edge - the address of the edge node the subscription lives on
+3. session - the session id pf the client listening for events with stringified subscription options
+
+The LRU cache and database are keyed by the address of the subscriptions, so the lookup is small for search nodes, edge nodes need only loop through subscriptions in the branch keyed by their own IP and port.
+
+```javascript
+{
+  address:{
+    "/test/1/2":{
+      edge:{
+        "10:0.0.1:6000":{ //edge node address and port
+            session:{
+            "eyJpc3MiOiJzY290Y2:{\"some\":\"option\"}":{ //session id
+              refCount:3 //essentially 
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+## about refCounts and subscription ids
+
+Clients perform subscribe requests only once for subscription path and option combinations, following that a local refCount is incremented or decremented depending on subscribe or unsubscribes - when the local refCount reaches zero a cluster unsubscribe message happens. Edge nodes do something similar whereby the subscription record is only broadcasted once consecutive subscribes and unsubscribes are also managed through a refCount which only broadcasts an unsubscribe when it is 0 or 1.
+
+# protocol:
+
+## happy path, login, subscribe, publish
 <img src="https://user-images.githubusercontent.com/1958406/36060561-d8e2c56e-0e54-11e8-918b-12875682ec16.png"></img>
 
-# statuses
+## statuses
 ```javascript
 const statuses = {
   action:{
@@ -235,4 +294,7 @@ const statuses = {
 }
 ```
 
+# how data could be shared
+
+If we use redis as the central db for subscriptions, our edge nodes could become the database updaters - so they essentially push changes to the subscription tree as necessary, after the change is written to the db a broadcast happens cluster wide that causes search nodes to update their caches, this is a nice performant flow that prevents the database getting locked or having concurrency issues because everyone is updating the db on broadcast.
 
