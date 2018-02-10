@@ -16,10 +16,10 @@ This is a cluster-first pub-sub solution - so not meant for single instance use,
 NB: edge nodes can also be search nodes
 
 ## subscriptions are costly, publication work is distributed
-all servers in the cluster have access to the full subscription list, each new subscription results in a cluster wide broadcast, the idea here is that subscriptions happen less often than publish operations. Publish operations on the other hand go through an edge node (one that holds client connections and sessions) - this node uses a hash-ring to direct the message to an internal cluster node that finds all the edge nodes that house subscribers that want to see the message and forward the message to them. 
+all servers in the cluster have access to the full subscription list, each new subscription results in a cluster wide broadcast, the idea here is that subscriptions happen less often than publish operations. Publish operations on the other hand go through an edge node (one that holds client connections and sessions) - this node uses a hash-ring to direct the message to an internal cluster node (search  node) that finds all the edge nodes that house subscribers that want to see the message and forward the message to them, the edge nodes in turn look up the subscribers amongst those clients connected to them and publish the event to the clients.
 
 ## why the hash-ring?
-What is nice about using the hash-ring instead of random or round robin (which could become a config setting later) - is that each node will hold an LRU cache for commonly published to addresses, if a hash-ring is used to logically arrange search requests across the cluster, each cluster node's LRU cache will be less fragmented, if subscription addresses are very random, the hash-ring will distribute requests randomly - so a nice balance.
+What is nice about using the hash-ring instead of random or round robin (which could become a config setting later) - is that each search node will hold an LRU cache for commonly published to addresses, if a hash-ring is used to logically arrange search requests across the cluster, each cluster node's LRU cache will be less fragmented, if subscription addresses are very random, the hash-ring will distribute requests randomly - so a nice balance.
 
 ## about wildcards
 On publish, the publish addresses are branched into the original address, ie: "/test/1/2" and into the additional wildcard options: "/test/1/*", "/test/*/*", "/*/*/*" - this is done by the search node (not the edge node) - which forwards these search requests to other search nodes identified by the hash ring. These can now be looked up by a key/value store of they are not available in the LRU cache of the search nodes, ie: redis?
@@ -32,7 +32,7 @@ Subscriptions are in a tree structure, with 3 levels:
 
 1. address - the actual subscription path, ie: "/test/1/2"
 2. edge - the address of the edge node the subscription lives on
-3. session - the session id pf the client listening for events with stringified subscription options
+3. session - the session id of the client listening for events with stringified subscription options, this is so we can have 2 identical subscriptions that may need to be handled differently because of their options.
 
 The LRU cache and database are keyed by the address of the subscriptions, so the lookup is small for search nodes, edge nodes need only loop through subscriptions in the branch keyed by their own IP and port.
 
@@ -55,7 +55,7 @@ The LRU cache and database are keyed by the address of the subscriptions, so the
 ```
 ## about refCounts and subscription ids
 
-Clients perform subscribe requests only once for subscription path and option combinations, following that a local refCount is incremented or decremented depending on subscribe or unsubscribes - when the local refCount reaches zero a cluster unsubscribe message happens. Edge nodes do something similar whereby the subscription record is only broadcasted once consecutive subscribes and unsubscribes are also managed through a refCount which only broadcasts an unsubscribe when it is 0 or 1.
+Clients perform subscribe requests only once for subscription path and option combinations, following that a local refCount is incremented or decremented depending on subscribe or unsubscribes - when the local refCount reaches zero a cluster unsubscribe message happens. Edge nodes do something similar whereby the subscription record is only broadcasted once consecutive subscribes and unsubscribes are also managed through a refCount which only broadcasts an unsubscribe/subscribe when it is 0 or 1 respectively.
 
 # protocol:
 
@@ -76,18 +76,18 @@ const statuses = {
 
 ## authenticate:
 
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
-  "time": 1518248771817,
-  "action": "authenticate",
-  "options":{
+```javascript
+var authenticatePacket = {
+  "tx": "049b7020-c787-41bf-a1d2-a97612c11418", //client generated tx id, so client is able to match up replies
+  "time": 1518248771817, //client generated timestamp
+  "action": "authenticate", //message type
+  "options":{ //action options - to change possible behaviour
     "type":"basic"
   },
-  "payload":{
+  "payload":{ //in a non-secured system this could be null
     "user":"test",
     "password":"password",
-    "publicKey":"[keypair used to decrypt re-establish]"
+    "publicKey":"[keypair used to decrypt re-establish token]"
   }
 }
 ```
