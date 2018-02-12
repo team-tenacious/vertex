@@ -1,0 +1,30 @@
+{
+  "name": "vertex",
+  "description": "distributed pub/sub using hash rings",
+  "version": "2.0.0",
+  "main": "./lib/index",
+  "scripts": {
+    "test": "mocha silence.js test"
+  },
+  "author": "Tenacious and NSOFT",
+  "license": "MIT",
+  "keywords": [
+    "hash-ring",
+    "pub-sub"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/happner/distributed-pubsub.git"
+  },
+  "dependencies": {
+    "async": "^2.6.0",
+    "hashring": "^3.2.0",
+    "hyperid": "^1.2.0",
+    "shortid": "^2.2.8"
+  },
+  "devDependencies": {
+    "mocha": "*",
+    "expect.js": "*"
+  },
+  "readmeFilename": "README.md"
+}
