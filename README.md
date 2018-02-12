@@ -1,5 +1,5 @@
-# muster
-Muster of sockets is pulling your strings...
+# vertex
+Clustered pubsub using hash-ring to distribute load
 
 # premise
 
