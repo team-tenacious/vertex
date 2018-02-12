@@ -1,6 +1,7 @@
 var path = require('path');
 var filename = path.basename(__filename);
 var expect = require('expect.js');
+const EventEmitter = require('events').EventEmitter;
 
 describe(filename, function () {
 
@@ -21,73 +22,46 @@ describe(filename, function () {
     done();
   });
 
+  class Connection extends EventEmitter {
+
+    constructor() {
+      super();
+    }
+
+    send(message) {
+
+    }
+
+    close(code, reason) {
+
+    }
+
+    connect(url, options) {
+      return new Promise((resolve) => {
+        resolve();
+      });
+    }
+  }
+
   it('mocks the connection uses it to test the client connect', function (done) {
+
+    this.timeout(10000);
 
     var Client = require('../../..').Client;
 
     var config = {url:'ws://127.0.0.1:3737'};
 
     var client = new Client(config, {
-      Connection:function(config){
-
-        function WebSocket(url, options){
-
-          this.close = function(code, reason){
-
-          };
-
-          this.send = function(message){
-
-          };
-        }
-
-        this.prototype.send = function(message) {
-
-          this.websocket.send(message);
-        };
-
-        this.prototype.close = function(code, reason) {
-
-          if (this.websocket) this.websocket.close(code, reason);
-        };
-
-        this.prototype.connect = function(url, options) {
-
-          return new Promise((resolve) => {
-
-            this.websocket = new WebSocket(url, options);
-
-            this.websocket.on('close', (code, reason) => {
-              this.emit('close', {code: code, reason: reason});
-            });
-
-            this.websocket.on('error', (error) => {
-              this.emit('error', error);
-            });
-
-            this.websocket.on('message', (message) => {
-              this.emit('message', message);
-            });
-
-            this.websocket.on('ping', (data) => {
-              this.emit('ping', data);
-            });
-
-            this.websocket.on('pong', (data) => {
-              this.emit('pong', data);
-            });
-
-            this.websocket.on('open', function () {
-              this.emit('open');
-              resolve();
-            });
-          });
-        }
-      }
+      Connection:Connection
     });
 
+    // client.on('all', function(event){
+    //   console.log(event.key, event.data);
+    // });
+    //
     client.on('connected', function(connection){
       done();
+      //setTimeout(done, 5000);
     });
 
     client.connect();
