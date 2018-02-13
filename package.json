@@ -18,13 +18,15 @@
   },
   "dependencies": {
     "async": "^2.6.0",
+    "dag-map": "^2.0.2",
+    "express": "^4.16.2",
     "hashring": "^3.2.0",
     "hyperid": "^1.2.0",
-    "shortid": "^2.2.8",
-    "ws": "^4.0.0",
     "json-socket": "^0.3.0",
+    "shortid": "^2.2.8",
     "vertex-logger": "^2.3.2",
-    "vertex-names": "^1.1.4"
+    "vertex-names": "^1.1.4",
+    "ws": "^4.0.0"
   },
   "devDependencies": {
     "mocha": "*",

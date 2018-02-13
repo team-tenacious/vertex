@@ -16,11 +16,15 @@ describe('unit - server - server', function () {
     var sorted = server.sortServices();
 
     expect(sorted).to.eql([
-      'membership',
+      'tcp',
+      'cluster',
+      'hashring',
+      'http',
+      'ws',
       'xxx',
-      'yyy'
+      'yyy',
+      'membership'
     ]);
-
   });
 
 });
