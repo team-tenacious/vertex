@@ -40,11 +40,22 @@ describe(filename, function () {
         this.emit('message', subscribeResponse);
       }
 
+      if (message.action == 'unsubscribe') {
+
+        var unsubscribeResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
+
+        this.emit('message', unsubscribeResponse);
+      }
+
       if (message.action == 'publish') {
 
         var publishMessage = protocol.createMessage('pub', message.payload);
 
         this.emit('message', publishMessage);
+
+        var publishResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
+
+        this.emit('message', publishResponse);
       }
     }
 
@@ -163,6 +174,8 @@ describe(filename, function () {
       Connection: Connection
     });
 
+    var emitCount = 0;
+
     client.on('connected', function () {
 
       client.on('close', function (info) {
@@ -170,16 +183,25 @@ describe(filename, function () {
       });
 
       client.subscribe('/a/test/path', function (data) {
-
-        expect(data).to.eql({some: "data"});
-
-        client.disconnect({code: 1, reason: 'intentional disconnect test'});
-
-      }).then(function () {
+        emitCount++;
+      }).then(function (subKey) {
 
         client.publish('/a/test/path', {some: "data"})
-          .then(function (response) {
-            //do nothing
+          .then((response) => {
+
+            client.unsubscribe(subKey).then(function(response){
+
+              client.publish('/a/test/path', {some: "data"})
+                .then(function (response) {
+
+                  setTimeout(() => {
+                    if (emitCount > 1) return done(new Error('unsub failed'));
+                    else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                  }, 5000);
+
+                }).catch(done);
+            });
+
           }).catch(done);
 
       }).catch(done);
