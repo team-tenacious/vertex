@@ -8,20 +8,26 @@ describe('integration - server - membership', function () {
 
     function createConfig(seq) {
       return {
+        name: 'node_' + seq,
         services: {
-          membership: {
+          tcp: {
+            host: '127.0.0.1',
+            port: 60606 + seq
+          },
+          cluster: {
             seed: seq == 1,
+            join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608']
           }
         }
       }
     }
 
     this.servers = await Promise.all([
-      Server.create(createConfig(seq++)) /*,
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)) */
+      Server.create(createConfig(seq++)) //,
+      // Server.create(createConfig(seq++)),
+      // Server.create(createConfig(seq++)),
+      // Server.create(createConfig(seq++)),
+      // Server.create(createConfig(seq++))
     ])
 
   });
