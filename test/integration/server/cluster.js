@@ -11,6 +11,7 @@ describe('integration - server - membership', function () {
         name: 'node_' + seq,
         services: {
           tcp: {
+            key: 'xxx',
             host: '127.0.0.1',
             port: 60606 + seq
           },
@@ -44,8 +45,12 @@ describe('integration - server - membership', function () {
 
   });
 
-  it('emits on member arrival');
+  it('emits on member joined');
 
-  it('emits on member departure');
+  it('emits on member left');
+
+  it('can write to peer in cluster');
+
+  it('can write to self');
 
 });

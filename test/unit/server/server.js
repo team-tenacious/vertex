@@ -16,6 +16,7 @@ describe('unit - server - server', function () {
     var sorted = server.sortServices();
 
     expect(sorted).to.eql([
+      'sockets',
       'tcp',
       'cluster',
       'hashring',
