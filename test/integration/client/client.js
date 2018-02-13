@@ -32,18 +32,15 @@ describe(filename, function () {
     }
 
     send(message) {
-      console.log('sending:::', message);
 
-      if (message.action == 'subscribe'){
+      if (message.action == 'subscribe') {
 
-        var subscribeResponse = protocol.createMessage('reply', {status:1, tx:message.tx});
-
-        console.log('subscribeResponse:::', subscribeResponse);
+        var subscribeResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
 
         this.emit('message', subscribeResponse);
       }
 
-      if (message.action == 'publish'){
+      if (message.action == 'publish') {
 
         var publishMessage = protocol.createMessage('pub', message.payload);
 
@@ -116,7 +113,45 @@ describe(filename, function () {
     client.connect();
   });
 
-  it('mocks the connection uses it to test the client subscribe and emit', function (done) {
+  it('mocks the connection uses it to test the client subscribe and publish', function (done) {
+
+    this.timeout(10000);
+
+    var Client = require('../../..').Client;
+
+    var config = {url: 'ws://127.0.0.1:3737'};
+
+    var client = new Client(config, {
+      Connection: Connection
+    });
+
+    client.on('connected', function () {
+
+      client.on('close', function (info) {
+        done();
+      });
+
+      client.subscribe('/a/test/path', function (data) {
+
+        expect(data).to.eql({some: "data"});
+
+        client.disconnect({code: 1, reason: 'intentional disconnect test'});
+
+      }).then(function () {
+
+        client.publish('/a/test/path', {some: "data"})
+          .then(function (response) {
+            //do nothing
+          }).catch(done);
+
+      }).catch(done);
+    });
+
+    client.connect();
+
+  });
+
+  it('mocks the connection uses it to test the client subscribe, publish and unsubscribe', function (done) {
 
     this.timeout(10000);
 
