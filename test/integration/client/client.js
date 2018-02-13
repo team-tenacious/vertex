@@ -2,6 +2,8 @@ var path = require('path');
 var filename = path.basename(__filename);
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
+const Protocol = require('../../../lib/common/protocol');
+const protocol = new Protocol();
 
 describe(filename, function () {
 
@@ -9,14 +11,15 @@ describe(filename, function () {
 
     var Client = require('../../..').Client;
 
-    var config = {url:'ws://127.0.0.1:3737'};
+    var config = {url: 'ws://127.0.0.1:3737'};
 
     var client = new Client(config);
 
     expect(client.config).to.eql({
-      connectionAttemptInterval:5000,
-      connectionOptions:{},
-      url:'ws://127.0.0.1:3737'
+      connectionAttemptInterval: 5000,
+      connectionOptions: {},
+      url: 'ws://127.0.0.1:3737',
+      callTimeout: 120000
     });
 
     done();
@@ -29,7 +32,23 @@ describe(filename, function () {
     }
 
     send(message) {
+      console.log('sending:::', message);
 
+      if (message.action == 'subscribe'){
+
+        var subscribeResponse = protocol.createMessage('reply', {status:1, tx:message.tx});
+
+        console.log('subscribeResponse:::', subscribeResponse);
+
+        this.emit('message', subscribeResponse);
+      }
+
+      if (message.action == 'publish'){
+
+        var publishMessage = protocol.createMessage('pub', message.payload);
+
+        this.emit('message', publishMessage);
+      }
     }
 
     close(code, reason) {
@@ -49,17 +68,17 @@ describe(filename, function () {
 
     var Client = require('../../..').Client;
 
-    var config = {url:'ws://127.0.0.1:3737'};
+    var config = {url: 'ws://127.0.0.1:3737'};
 
     var client = new Client(config, {
-      Connection:Connection
+      Connection: Connection
     });
 
     // client.on('all', function(event){
     //   console.log(event.key, event.data);
     // });
     //
-    client.on('connected', function(){
+    client.on('connected', function () {
       done();
       //setTimeout(done, 5000);
     });
@@ -73,19 +92,19 @@ describe(filename, function () {
 
     var Client = require('../../..').Client;
 
-    var config = {url:'ws://127.0.0.1:3737'};
+    var config = {url: 'ws://127.0.0.1:3737'};
 
     var client = new Client(config, {
-      Connection:Connection
+      Connection: Connection
     });
 
     // client.on('all', function(event){
     //   console.log(event.key, event.data);
     // });
     //
-    client.on('connected', function(){
+    client.on('connected', function () {
 
-      client.on('close', function(info){
+      client.on('close', function (info) {
         expect(info.code).to.be(1);
         expect(info.reason).to.be('intentional disconnect test');
         done();
@@ -95,5 +114,43 @@ describe(filename, function () {
     });
 
     client.connect();
+  });
+
+  it('mocks the connection uses it to test the client subscribe and emit', function (done) {
+
+    this.timeout(10000);
+
+    var Client = require('../../..').Client;
+
+    var config = {url: 'ws://127.0.0.1:3737'};
+
+    var client = new Client(config, {
+      Connection: Connection
+    });
+
+    client.on('connected', function () {
+
+      client.on('close', function (info) {
+        done();
+      });
+
+      client.subscribe('/a/test/path', function (data) {
+
+        expect(data).to.eql({some: "data"});
+
+        client.disconnect({code: 1, reason: 'intentional disconnect test'});
+
+      }).then(function () {
+
+        client.publish('/a/test/path', {some: "data"})
+          .then(function (response) {
+            //do nothing
+          }).catch(done);
+
+      }).catch(done);
+    });
+
+    client.connect();
+
   });
 });
