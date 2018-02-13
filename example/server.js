@@ -4,7 +4,7 @@ module.exports = function (seq) {
 
   Server.create({
       logger: {
-        level: 'info',
+        level: 'debug',
         // level: (d) => { // loglevel functor
         //   console.log(d);
         //   return 'info'
@@ -12,6 +12,7 @@ module.exports = function (seq) {
       },
       services: {
         tcp: {
+          key: 'xxx',
           host: '127.0.0.1',
           port: 60606 + seq
         },
