@@ -1,6 +1,7 @@
+const expect = require('expect.js');
 const { Server } = require('../../../');
 
-describe('integration - server - membership', function () {
+describe('integration - server - cluster', function () {
 
   var seq = 0;
 
@@ -46,6 +47,17 @@ describe('integration - server - membership', function () {
   });
 
   it('fully connected the members', function () {
+
+    for (var server of this.servers) {
+      var peerList = server.services.cluster.listPeers();
+      expect(peerList).to.eql([
+        '127.0.0.1:60606',
+        '127.0.0.1:60607',
+        '127.0.0.1:60608',
+        '127.0.0.1:60609',
+        '127.0.0.1:60610'
+      ]);
+    }
 
   });
 
