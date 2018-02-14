@@ -24,7 +24,10 @@ describe('unit - server - server', function () {
       'ws',
       'xxx',
       'yyy',
-      'membership'
+      'membership',
+      'cache',
+      'subscription',
+      'edge'
     ]);
   });
 
