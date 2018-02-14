@@ -19,6 +19,9 @@ module.exports = function (seq) {
         cluster: {
           seed: seq == 0,
           join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608']
+        },
+        http: {
+          port: 3737 + seq
         }
       }
     })
