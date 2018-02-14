@@ -2,7 +2,10 @@ const { Server } = require('../');
 
 module.exports = function (seq) {
 
+  const seqInt = parseInt(seq);
+
   Server.create({
+      name: 'node-' + seq,
       logger: {
         level: 'debug',
         // level: (d) => { // loglevel functor
@@ -14,14 +17,14 @@ module.exports = function (seq) {
         tcp: {
           key: 'xxx',
           host: '127.0.0.1',
-          port: 60606 + seq
+          port: 60606 + seqInt
         },
         cluster: {
-          seed: seq == 0,
+          seed: seqInt == 0,
           join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608']
         },
         http: {
-          port: 3737 + seq
+          port: 3737 + seqInt
         }
       }
     })

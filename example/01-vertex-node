@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
 const path = require('path');
-const seq = parseInt(__filename.split(path.sep).pop().split('_').shift());
+const seq = __filename.split(path.sep).pop().split('-').shift();
 
 require('./server')(seq);
