@@ -12,11 +12,11 @@ describe('integration - server - cluster', function () {
         name: 'node_' + seq,
         services: {
           tcp: {
-            key: 'xxx',
             host: '127.0.0.1',
             port: 60606 + seq
           },
           cluster: {
+            secret: 'xxx',
             seed: seq == 0,
             join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608'],
             joinWait: 200

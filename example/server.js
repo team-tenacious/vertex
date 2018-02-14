@@ -15,11 +15,11 @@ module.exports = function (seq) {
       },
       services: {
         tcp: {
-          key: 'xxx',
           host: '127.0.0.1',
           port: 60606 + seqInt
         },
         cluster: {
+          secret: 'xxx',
           seed: seqInt == 0,
           join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608']
         },
