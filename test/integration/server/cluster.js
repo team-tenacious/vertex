@@ -65,8 +65,6 @@ describe('integration - server - cluster', function () {
 
   it('emits on member left');
 
-  it('can write to peer in cluster');
-
-  it('can write to self');
+  it('can write to all peers in the cluster');
 
 });

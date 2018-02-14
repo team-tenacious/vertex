@@ -7,7 +7,7 @@ module.exports = function (seq) {
   Server.create({
       name: 'node-' + seq,
       logger: {
-        level: 'debug',
+        level: process.env.LOG_LEVEL || 'info',
         // level: (d) => { // loglevel functor
         //   console.log(d);
         //   return 'info'
