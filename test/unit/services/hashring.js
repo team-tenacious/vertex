@@ -2,13 +2,22 @@ var path = require('path');
 var filename = path.basename(__filename);
 var Hashring = require('../../../lib/server/services/hashring');
 var expect = require('expect.js');
+const EventEmitter = require('events').EventEmitter;
 
 describe(filename, function () {
+
+  var mockCluster =  new EventEmitter();
+
+  mockCluster.listPeers = function(){
+    return ['10:0.0.1:5000','10:0.0.2:5000','10:0.0.3:5000','10:0.0.4:5000'];
+  };
 
   function mockServer() {
 
     return {
-      services: {}
+      services: {
+        cluster: mockCluster
+      }
     }
   }
 
@@ -33,12 +42,12 @@ describe(filename, function () {
 
     var hashring = new Hashring(mockServer(), mockLogger(), mockConfig());
 
-    hashring.addMember('10:0.0.1:5000');
-    hashring.addMember('10:0.0.2:5000');
-    hashring.addMember('10:0.0.3:5000');
-    hashring.addMember('10:0.0.4:5000');
+    hashring.memberJoined();
+    hashring.memberJoined();
+    hashring.memberJoined();
+    hashring.memberJoined();
 
-    hashring.removeMember('10:0.0.4:5000');
+    hashring.memberLeft('10:0.0.4:5000');
 
     var gotMembers = hashring.listMembers('1234');
 
