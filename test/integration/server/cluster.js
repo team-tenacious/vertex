@@ -1,55 +1,17 @@
 const expect = require('expect.js');
-const { Server } = require('../../../');
+const TestCluster = require('../../lib/test-cluster');
 const { pause } = require('../../../lib/common/utils');
 
 describe('integration - server - cluster', function () {
 
-  var seq = 0;
-
-  function createConfig(seq) {
-    return {
-      name: 'node_' + seq,
-      logger: {
-        level: process.env.LOG_LEVEL || 'info'
-      },
-      services: {
-        tcp: {
-          host: '127.0.0.1',
-          port: 60606 + seq
-        },
-        cluster: {
-          secret: 'xxx',
-          seed: seq == 0,
-          join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608'],
-          joinWait: 200
-        },
-        http: {
-          port: 3737 + seq
-        }
-      }
-    }
-  }
-
   before('start servers', async function () {
-
     this.timeout(10 * 1000);
-
-    this.servers = await Promise.all([
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++))
-    ]);
-
+    this.testCluster = new TestCluster();
+    this.servers = await this.testCluster.startServers(5);
   });
 
   after('stop servers', async function () {
-    if (!this.servers) return;
-    for (var i = 0; i < this.servers.length; i++) {
-      await this.servers[i].stop();
-    }
-
+    await this.testCluster.stop();
   });
 
   it('fully connected the members', function () {
@@ -78,12 +40,12 @@ describe('integration - server - cluster', function () {
     this.servers[4].services.cluster.on('join', address => joinAddress = address);
     this.servers[4].services.cluster.on('leave', address => leaveAddress = address);
 
-    server = await Server.create(createConfig(100));
-    await server.stop();
+    [server] = await this.testCluster.startServers(1);
+    await this.testCluster.stopServer(server);
     await pause(100);
 
-    expect(joinAddress).to.eql('127.0.0.1:60706');
-    expect(leaveAddress).to.eql('127.0.0.1:60706');
+    expect(joinAddress).to.eql('127.0.0.1:60611');
+    expect(leaveAddress).to.eql('127.0.0.1:60611');
 
   });
 
@@ -115,6 +77,16 @@ describe('integration - server - cluster', function () {
       });
 
     }
+
+  });
+
+  context('request()', function () {
+
+    it('can write to remote node and receive reply');
+
+    it('rejects after a timeout');
+
+    it('rejects if the remote node goes down after send');
 
   });
 
