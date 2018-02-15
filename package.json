@@ -22,15 +22,18 @@
     "express": "^4.16.2",
     "hashring": "^3.2.0",
     "hyperid": "^1.2.0",
+    "ioredis": "^3.2.2",
     "json-socket": "^0.3.0",
+    "lru-cache": "^4.1.1",
     "shortid": "^2.2.8",
     "vertex-logger": "^2.3.2",
     "vertex-names": "^1.1.4",
     "ws": "^4.0.0"
   },
   "devDependencies": {
+    "expect.js": "*",
     "mocha": "*",
-    "expect.js": "*"
+    "request": "^2.83.0"
   },
   "readmeFilename": "README.md"
 }
