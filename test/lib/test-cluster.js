@@ -56,7 +56,11 @@ module.exports = class TestCluster {
       }
     }
 
-    // TODO_IF: ammend config per opts
+    if (typeof opts.clusterRequestTimeout == 'number') {
+      config.services.cluster.requestTimeout = opts.clusterRequestTimeout;
+    }
+
+    console.log(config);
 
     return config;
   }

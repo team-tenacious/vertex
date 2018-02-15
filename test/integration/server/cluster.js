@@ -1,5 +1,7 @@
 const expect = require('expect.js');
 const TestCluster = require('../../lib/test-cluster');
+const Protocol = require('../../../lib/common/protocol');
+const protocol = new Protocol();
 const { pause } = require('../../../lib/common/utils');
 
 describe('integration - server - cluster', function () {
@@ -80,11 +82,45 @@ describe('integration - server - cluster', function () {
 
   });
 
-  context('request()', function () {
+  context.only('request()', function () {
 
-    it('can write to remote node and receive reply');
+    it('can write to remote node and receive reply', async function () {
 
-    it('rejects after a timeout');
+      var sender = this.servers[1];
+      var receiver = this.servers[0];
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      receiver.services.cluster.on('message', (senderAddress, message) => {
+        var reply = protocol.createReply(message, {replyPayload: 1});
+        receiver.services.cluster.write(senderAddress, reply)
+          .catch(console.error);
+      });
+
+      var reply = await sender.services.cluster.request(receiverAddress, {});
+      expect(reply.payload).to.eql({replyPayload: 1});
+
+    });
+
+    it('rejects after a timeout', async function () {
+
+      var sender = this.servers[2];
+      var [receiver] = await this.testCluster.startServers(1, {
+        clusterRequestTimeout: 200
+      });
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      try {
+        console.log('SEND');
+        await sender.services.cluster.request(receiverAddress, {});
+        console.log('SENT');
+      } catch (e) {
+        console.log('GOT ERROR', e);
+      }
+
+      await this.testCluster.stopServer(receiver);
+      await pause(100);
+
+    });
 
     it('rejects if the remote node goes down after send');
 
