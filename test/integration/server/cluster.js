@@ -82,7 +82,7 @@ describe('integration - server - cluster', function () {
 
   });
 
-  context.only('request()', function () {
+  context('request()', function () {
 
     it('can write to remote node and receive reply', async function () {
 
@@ -104,25 +104,53 @@ describe('integration - server - cluster', function () {
     it('rejects after a timeout', async function () {
 
       var sender = this.servers[2];
-      var [receiver] = await this.testCluster.startServers(1, {
-        clusterRequestTimeout: 200
-      });
+      var [receiver] = await this.testCluster.startServers(1);
       var receiverAddress = receiver.services.cluster.advertiseAddress;
 
+      var originalRequestTimeout = sender.services.cluster.config.requestTimeout;
+      var error;
+
+      sender.services.cluster.config.requestTimeout = 200;
+
       try {
-        console.log('SEND');
         await sender.services.cluster.request(receiverAddress, {});
-        console.log('SENT');
       } catch (e) {
-        console.log('GOT ERROR', e);
+        error = e;
       }
+
+      sender.services.cluster.config.requestTimeout = originalRequestTimeout;
+      expect(error.name).to.be('RequestTimeoutError');
 
       await this.testCluster.stopServer(receiver);
       await pause(100);
 
     });
 
-    it('rejects if the remote node goes down after send');
+    it('rejects if the remote node goes down after send', async function () {
+
+      var sender = this.servers[3];
+      var [receiver] = await this.testCluster.startServers(1);
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      var error;
+
+      try {
+        await Promise.all([
+          sender.services.cluster.request(receiverAddress, {}),
+          new Promise((resolve, reject) => {
+            setTimeout(() => {
+              this.testCluster.stopServer(receiver)
+                .then(resolve).catch(reject);
+            }, 100);
+          })
+        ]);
+      } catch (e) {
+        error = e;
+      }
+
+      expect(error.name).to.be('RequestToDepartedError');
+
+    });
 
   });
 

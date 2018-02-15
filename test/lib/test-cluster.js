@@ -60,8 +60,6 @@ module.exports = class TestCluster {
       config.services.cluster.requestTimeout = opts.clusterRequestTimeout;
     }
 
-    console.log(config);
-
     return config;
   }
 }
