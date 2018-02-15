@@ -1,55 +1,19 @@
 const expect = require('expect.js');
-const { Server } = require('../../../');
+const TestCluster = require('../../lib/test-cluster');
+const Protocol = require('../../../lib/common/protocol');
+const protocol = new Protocol();
 const { pause } = require('../../../lib/common/utils');
 
 describe('integration - server - cluster', function () {
 
-  var seq = 0;
-
-  function createConfig(seq) {
-    return {
-      name: 'node_' + seq,
-      logger: {
-        level: process.env.LOG_LEVEL || 'info'
-      },
-      services: {
-        tcp: {
-          host: '127.0.0.1',
-          port: 60606 + seq
-        },
-        cluster: {
-          secret: 'xxx',
-          seed: seq == 0,
-          join: ['127.0.0.1:60606', '127.0.0.1:60607', '127.0.0.1:60608'],
-          joinWait: 200
-        },
-        http: {
-          port: 3737 + seq
-        }
-      }
-    }
-  }
-
   before('start servers', async function () {
-
     this.timeout(10 * 1000);
-
-    this.servers = await Promise.all([
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++)),
-      Server.create(createConfig(seq++))
-    ]);
-
+    this.testCluster = new TestCluster();
+    this.servers = await this.testCluster.startServers(5);
   });
 
   after('stop servers', async function () {
-    if (!this.servers) return;
-    for (var i = 0; i < this.servers.length; i++) {
-      await this.servers[i].stop();
-    }
-
+    await this.testCluster.stop();
   });
 
   it('fully connected the members', function () {
@@ -78,12 +42,12 @@ describe('integration - server - cluster', function () {
     this.servers[4].services.cluster.on('join', address => joinAddress = address);
     this.servers[4].services.cluster.on('leave', address => leaveAddress = address);
 
-    server = await Server.create(createConfig(100));
-    await server.stop();
+    [server] = await this.testCluster.startServers(1);
+    await this.testCluster.stopServer(server);
     await pause(100);
 
-    expect(joinAddress).to.eql('127.0.0.1:60706');
-    expect(leaveAddress).to.eql('127.0.0.1:60706');
+    expect(joinAddress).to.eql('127.0.0.1:60611');
+    expect(leaveAddress).to.eql('127.0.0.1:60611');
 
   });
 
@@ -115,6 +79,78 @@ describe('integration - server - cluster', function () {
       });
 
     }
+
+  });
+
+  context('request()', function () {
+
+    it('can write to remote node and receive reply', async function () {
+
+      var sender = this.servers[1];
+      var receiver = this.servers[0];
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      receiver.services.cluster.on('message', (senderAddress, message) => {
+        var reply = protocol.createReply(message, {replyPayload: 1});
+        receiver.services.cluster.write(senderAddress, reply)
+          .catch(console.error);
+      });
+
+      var reply = await sender.services.cluster.request(receiverAddress, {});
+      expect(reply.payload).to.eql({replyPayload: 1});
+
+    });
+
+    it('rejects after a timeout', async function () {
+
+      var sender = this.servers[2];
+      var [receiver] = await this.testCluster.startServers(1);
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      var originalRequestTimeout = sender.services.cluster.config.requestTimeout;
+      var error;
+
+      sender.services.cluster.config.requestTimeout = 200;
+
+      try {
+        await sender.services.cluster.request(receiverAddress, {});
+      } catch (e) {
+        error = e;
+      }
+
+      sender.services.cluster.config.requestTimeout = originalRequestTimeout;
+      expect(error.name).to.be('RequestTimeoutError');
+
+      await this.testCluster.stopServer(receiver);
+      await pause(100);
+
+    });
+
+    it('rejects if the remote node goes down after send', async function () {
+
+      var sender = this.servers[3];
+      var [receiver] = await this.testCluster.startServers(1);
+      var receiverAddress = receiver.services.cluster.advertiseAddress;
+
+      var error;
+
+      try {
+        await Promise.all([
+          sender.services.cluster.request(receiverAddress, {}),
+          new Promise((resolve, reject) => {
+            setTimeout(() => {
+              this.testCluster.stopServer(receiver)
+                .then(resolve).catch(reject);
+            }, 100);
+          })
+        ]);
+      } catch (e) {
+        error = e;
+      }
+
+      expect(error.name).to.be('RequestToDepartedError');
+
+    });
 
   });
 
