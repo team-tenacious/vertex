@@ -35,14 +35,14 @@ describe(filename, function () {
 
       if (message.action == 'subscribe') {
 
-        var subscribeResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
+        var subscribeResponse = protocol.createReply(message, {status: 1});
 
         this.emit('message', subscribeResponse);
       }
 
       if (message.action == 'unsubscribe') {
 
-        var unsubscribeResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
+        var unsubscribeResponse = protocol.createReply(message, {status: 1});
 
         this.emit('message', unsubscribeResponse);
       }
@@ -53,7 +53,7 @@ describe(filename, function () {
 
         this.emit('message', publishMessage);
 
-        var publishResponse = protocol.createMessage('reply', {status: 1, tx: message.tx});
+        var publishResponse = protocol.createReply(message, {status: 1});
 
         this.emit('message', publishResponse);
       }
@@ -189,7 +189,7 @@ describe(filename, function () {
         client.publish('/a/test/path', {some: "data"})
           .then((response) => {
 
-            client.unsubscribe(subKey).then(function(response){
+            client.unsubscribe(subKey).then(function (response) {
 
               client.publish('/a/test/path', {some: "data"})
                 .then(function (response) {
