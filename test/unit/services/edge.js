@@ -4,7 +4,7 @@ var Edge = require('../../../lib/server/services/edge');
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
 
-describe(filename, function () {
+xdescribe(filename, function () {
 
 
   function mockServer() {

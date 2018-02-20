@@ -4,7 +4,7 @@ var Subscription = require('../../../lib/server/services/subscription');
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
 
-describe(filename, function () {
+xdescribe(filename, function () {
 
 
   function mockServer() {

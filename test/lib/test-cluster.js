@@ -8,6 +8,7 @@ module.exports = class TestCluster {
   }
 
   async startServers(count, opts = {}) {
+
     var servers;
     var promises = [];
 
@@ -54,7 +55,7 @@ module.exports = class TestCluster {
           port: 3737 + seq
         }
       }
-    }
+    };
 
     if (typeof opts.clusterRequestTimeout == 'number') {
       config.services.cluster.requestTimeout = opts.clusterRequestTimeout;
@@ -62,4 +63,4 @@ module.exports = class TestCluster {
 
     return config;
   }
-}
+};

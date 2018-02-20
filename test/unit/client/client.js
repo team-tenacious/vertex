@@ -5,7 +5,7 @@ const EventEmitter = require('events').EventEmitter;
 const Protocol = require('../../../lib/common/protocol');
 const protocol = new Protocol();
 
-describe(filename, function () {
+xdescribe(filename, function () {
 
   it('initializes a client with a config', function (done) {
 
