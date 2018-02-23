@@ -92,7 +92,7 @@ describe(filename, function () {
     client.connect();
   });
 
-  xit('does the client subscribe, publish and unsubscribe', function (done) {
+  it('does the client subscribe, publish and unsubscribe', function (done) {
 
     this.timeout(10000);
 
