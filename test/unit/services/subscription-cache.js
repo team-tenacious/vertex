@@ -40,7 +40,7 @@ describe(filename, function () {
       .catch(done);
   });
 
-  it.only('adds, finds and removes an item from the cache service', function (done) {
+  it('adds, finds and removes an item from the cache service', function (done) {
 
     var cache = new Cache(mockServer(), mockLogger(), mockConfig());
 
@@ -72,48 +72,6 @@ describe(filename, function () {
       })
       .then(function (value) {
         expect(value).to.eql([]);
-        done();
-      })
-      .catch(done);
-  });
-
-  it('tree adds, finds and removes an item from the cache service', function (done) {
-
-    var cache = new Cache(mockServer(), mockLogger(), mockConfig());
-
-    cache.start()
-      .then(function () {
-        return cache.setTree('EDGE_SUBS:10:0.0.1:9000', 'test1', 'test1');
-      })
-      .then(function () {
-        return cache.setTree('EDGE_SUBS:10:0.0.1:9000', 'test1', 'test2');
-      })
-      .then(function () {
-        return cache.getTree('EDGE_SUBS:10:0.0.1:9000', 'test1');
-      })
-      .then(function (value) {
-        expect(value).to.eql(['test1', 'test2']);
-        return cache.removeTree('EDGE_SUBS:10:0.0.1:9000', 'test1', 'test1');
-      })
-      .then(function () {
-        return cache.getTree('EDGE_SUBS:10:0.0.1:9000', 'test1');
-      })
-      .then(function (value) {
-        expect(value).to.eql(['test2']);
-        return cache.setTree('EDGE_SUBS:10:0.0.1:9000', 'test1', 'test3');
-      })
-      .then(function () {
-        return cache.getTree('EDGE_SUBS:10:0.0.1:9000', 'test1');
-      })
-      .then(function (value) {
-        expect(value).to.eql(['test2', 'test3']);
-        return cache.removeTree('EDGE_SUBS:10:0.0.1:9000');
-      })
-      .then(function () {
-        return cache.getTree('EDGE_SUBS:10:0.0.1:9000', 'test1');
-      })
-      .then(function (value) {
-        expect(value).to.be([]);
         done();
       })
       .catch(done);

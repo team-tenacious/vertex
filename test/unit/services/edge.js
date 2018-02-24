@@ -3,34 +3,18 @@ var filename = path.basename(__filename);
 var Edge = require('../../../lib/server/services/edge');
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
+const SubscriptionCache = require('../../../lib/server/services/subscription-cache');
 
-xdescribe(filename, function () {
+describe.only(filename, function () {
 
-
-  function mockServer() {
+  async function mockServer() {
 
     var ws = new EventEmitter();
     var hashring = new EventEmitter();
     var cluster = new EventEmitter();
-    var cache = new EventEmitter();
-
-    var __cache = {};
 
     ws.write = (sessionId, message) => {
       ws.emit('wrote', {sessionId: sessionId, message: message});
-    };
-
-    cache.get = function (key) {
-      return new Promise(function (resolve) {
-        resolve(__cache[key] || []);
-      });
-    };
-
-    cache.set = function (key, value) {
-      return new Promise(function (resolve) {
-        __cache[key] = value;
-        resolve(value);
-      });
     };
 
     cluster.listPeers = function () {
@@ -41,21 +25,26 @@ xdescribe(filename, function () {
       return new Promise(function (resolve) {
 
         if (message.action == 'subscription-query') return resolve({edges: ['10:0.0.1:5000', '10:0.0.2:5000']});
-
         resolve('ok');
       })
     };
 
+    cluster.advertiseAddress = '10.0.0.1:8000';
+
     hashring.listMembers = function (topic) {
       return ['10:0.0.1:5000'];
     };
+
+    var cache = new SubscriptionCache({}, mockLogger(), mockConfig());
+
+    await cache.start();
 
     return {
       services: {
         cluster: cluster,
         ws: ws,
         hashring: hashring,
-        cache: cache
+        'subscription-cache': cache
       }
     }
   }
@@ -77,34 +66,24 @@ xdescribe(filename, function () {
     return {};
   }
 
-  it('starts the edge service, pushes an unknown action through', function (done) {
+  it.only('starts the edge service, pushes a subscribe action through', function (done) {
 
-    var server = mockServer();
+    mockServer().then(function(server){
 
-    var edge = new Edge(server, mockLogger(), mockConfig());
+      var edge = new Edge(server, mockLogger(), mockConfig());
 
-    edge.on('message-process-error', function (e) {
-      expect(e.toString()).to.be('Error: No handler for action: unknown');
-      done();
-    });
+      edge.start().then(()=>{
 
-    server.services.ws.emit('message', {sessionId: 'testId', data: {action: 'unknown'}});
-  });
+        edge.on('message-process-ok', function (data) {
+          expect(data.response).to.be('ok');
+          done();
+        });
 
-  it('starts the edge service, pushes a subscribe action through', function (done) {
-
-    var server = mockServer();
-
-    var edge = new Edge(server, mockLogger(), mockConfig());
-
-    edge.on('message-process-ok', function (data) {
-      expect(data.response).to.be('ok');
-      done();
-    });
-
-    server.services.ws.emit('message', {
-      sessionId: 'testId',
-      data: {action: 'subscribe', payload: {topic: 'test-topic'}}
+        server.services.ws.emit('message', {
+          sessionId: 'testId',
+          data: {action: 'subscribe', payload: {topic: 'test-topic'}}
+        });
+      })
     });
   });
 
