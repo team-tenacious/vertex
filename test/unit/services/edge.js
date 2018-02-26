@@ -4,6 +4,7 @@ var Edge = require('../../../lib/server/services/edge');
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
 const SubscriptionCache = require('../../../lib/server/services/subscription-cache');
+const protocol = require('../../../lib/common/protocol').create();
 
 describe.only(filename, function () {
 
@@ -22,9 +23,10 @@ describe.only(filename, function () {
     };
 
     cluster.request = function (peer, message) {
+
       return new Promise(function (resolve) {
 
-        if (message.action == 'subscription-query') return resolve({edges: ['10:0.0.1:5000', '10:0.0.2:5000']});
+        if (message.action == 'edges') return resolve(protocol.createReply(message, {response: {edges: ['10:0.0.1:5000', '10:0.0.2:5000']}}));
         resolve('ok');
       })
     };
@@ -66,13 +68,13 @@ describe.only(filename, function () {
     return {};
   }
 
-  it.only('starts the edge service, pushes a subscribe action through', function (done) {
+  it('starts the edge service, pushes a subscribe action through', function (done) {
 
-    mockServer().then(function(server){
+    mockServer().then(function (server) {
 
       var edge = new Edge(server, mockLogger(), mockConfig());
 
-      edge.start().then(()=>{
+      edge.start().then(()=> {
 
         edge.on('message-process-ok', function (data) {
           expect(data.response).to.be('ok');
@@ -89,57 +91,62 @@ describe.only(filename, function () {
 
   it('starts the edge service, pushes an unsubscribe action through', function (done) {
 
-    var server = mockServer();
+    mockServer()
+      .then(function (server) {
 
-    var edge = new Edge(server, mockLogger(), mockConfig());
+        var edge = new Edge(server, mockLogger(), mockConfig());
 
-    edge.on('message-process-ok', function (data) {
-      expect(data.response).to.be('ok');
-      if (data.message.data.action == 'subscribe')
+        edge.on('message-process-ok', function (data) {
+          expect(data.response).to.be('ok');
+          if (data.message.data.action == 'subscribe')
+            server.services.ws.emit('message', {
+              sessionId: 'testId',
+              data: {action: 'unsubscribe', payload: {topic: 'test-topic'}}
+            });
+          else {
+            expect(data.message.data.action).to.be('unsubscribe');
+            done();
+          }
+        });
+
         server.services.ws.emit('message', {
           sessionId: 'testId',
-          data: {action: 'unsubscribe', payload: {topic: 'test-topic'}}
+          data: {action: 'subscribe', payload: {topic: 'test-topic'}}
         });
-      else {
-        expect(data.message.data.action).to.be('unsubscribe');
-        done();
-      }
-    });
 
-    server.services.ws.emit('message', {
-      sessionId: 'testId',
-      data: {action: 'subscribe', payload: {topic: 'test-topic'}}
-    });
+      });
   });
 
   it('starts the edge service, pushes a publish action through', function (done) {
 
-    var server = mockServer();
+    mockServer()
+      .then(function (server) {
 
-    var edge = new Edge(server, mockLogger(), mockConfig());
+        var edge = new Edge(server, mockLogger(), mockConfig());
 
-    edge.on('message-process-ok', function (data) {
+        edge.on('message-process-ok', function (data) {
+          
+          if (data.message.data.action == 'subscribe') {
 
-      if (data.message.data.action == 'subscribe') {
+            expect(data.response).to.be('ok');
 
-        expect(data.response).to.be('ok');
+            server.services.ws.emit('message', {
+              sessionId: 'testId',
+              data: {action: 'publish', payload: {topic: 'test-topic', data: 'test-data'}}
+            });
+          }
+          else {
+
+            expect(data.message.data.action).to.be('publish');
+            expect(data.response).to.eql({'test-topic': 2, '*': 2});
+            done();
+          }
+        });
 
         server.services.ws.emit('message', {
           sessionId: 'testId',
-          data: {action: 'publish', payload: {topic: 'test-topic', data: 'test-data'}}
+          data: {action: 'subscribe', payload: {topic: 'test-topic'}}
         });
-      }
-      else {
-
-        expect(data.message.data.action).to.be('publish');
-        expect(data.response).to.eql({'test-topic': 2, '*': 2});
-        done();
-      }
-    });
-
-    server.services.ws.emit('message', {
-      sessionId: 'testId',
-      data: {action: 'subscribe', payload: {topic: 'test-topic'}}
-    });
+      });
   });
 });
