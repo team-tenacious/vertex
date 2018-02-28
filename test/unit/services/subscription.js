@@ -1,36 +1,20 @@
 var path = require('path');
 var filename = path.basename(__filename);
 var Subscription = require('../../../lib/server/services/subscription');
+const SubscriptionCache = require('../../../lib/server/services/subscription-cache');
 var expect = require('expect.js');
 const EventEmitter = require('events').EventEmitter;
 
-xdescribe(filename, function () {
+describe(filename, function () {
 
-
-  function mockServer() {
+  async function mockServer() {
 
     var ws = new EventEmitter();
     var hashring = new EventEmitter();
     var cluster = new EventEmitter();
-    var cache = new EventEmitter();
-
-    var __cache = {};
 
     ws.write = (sessionId, message) => {
       ws.emit('wrote', {sessionId: sessionId, message: message});
-    };
-
-    cache.get = function (key) {
-      return new Promise(function (resolve) {
-        resolve(__cache[key] || []);
-      });
-    };
-
-    cache.set = function (key, value) {
-      return new Promise(function (resolve) {
-        __cache[key] = value;
-        resolve(value);
-      });
     };
 
     cluster.listPeers = function () {
@@ -46,7 +30,9 @@ xdescribe(filename, function () {
       })
     };
 
-    cluster.write = function(address, message){
+    cluster.advertiseAddress = '10.0.0.1:8000';
+
+    cluster.write = function (address, message) {
       return new Promise(function (resolve) {
         resolve();
       });
@@ -56,12 +42,16 @@ xdescribe(filename, function () {
       return ['10:0.0.1:5000'];
     };
 
+    var cache = new SubscriptionCache({}, mockLogger(), mockConfig());
+
+    await cache.start();
+
     return {
       services: {
         cluster: cluster,
         ws: ws,
         hashring: hashring,
-        cache: cache
+        'subscription-cache': cache
       }
     }
   }
@@ -83,78 +73,70 @@ xdescribe(filename, function () {
     return {};
   }
 
-  it('starts the subscription service, pushes an unknown action through', function (done) {
-
-    var server = mockServer();
-
-    var subscription = new Subscription(server, mockLogger(), mockConfig());
-
-    subscription.on('message-process-error', function (e) {
-      expect(e.toString()).to.be('Error: No handler for action: unknown');
-      done();
-    });
-
-    server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'unknown'});
-  });
-
   it('starts the subscription service, pushes a subscribe action through', function (done) {
 
-    var server = mockServer();
+    mockServer().then(function (server) {
 
-    var subscription = new Subscription(server, mockLogger(), mockConfig());
+      var subscription = new Subscription(server, mockLogger(), mockConfig());
 
-    subscription.on('message-process-ok', function (data) {
-      expect(data.response).to.eql([ '10.0.0.1:6767' ]);
-      done();
+      subscription.on('message-process-ok', function (data) {
+        expect(data.response).to.eql(['10.0.0.1:6767']);
+        done();
+      });
+
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
     });
-
-    server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
   });
 
   it('starts the subscription service, pushes an unsubscribe action through', function (done) {
 
-    var server = mockServer();
+    mockServer().then(function (server) {
 
-    var subscription = new Subscription(server, mockLogger(), mockConfig());
+      var subscription = new Subscription(server, mockLogger(), mockConfig());
 
-    subscription.on('message-process-ok', function (data) {
+      subscription.on('message-process-ok', function (data) {
 
-      if (data.message.action == 'subscribe'){
-        expect(data.response).to.eql([ '10.0.0.1:6767' ]);
-        server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'unsubscribe', payload: {topic: 'test-topic'}});
-      }
-      else {
-        expect(data.message.action).to.be('unsubscribe');
-        expect(data.response).to.eql([]);
-        done();
-      }
+        if (data.message.action == 'subscribe') {
+          expect(data.response).to.eql(['10.0.0.1:6767']);
+          server.services.cluster.emit('message', '10.0.0.1:6767', {
+            action: 'unsubscribe',
+            payload: {topic: 'test-topic'}
+          });
+        }
+        else {
+          expect(data.message.action).to.be('unsubscribe');
+          expect(data.response).to.eql([]);
+          done();
+        }
+      });
+
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
     });
-
-    server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
   });
 
   it('starts the subscription service, pushes a edges action through', function (done) {
 
-    var server = mockServer();
+    mockServer().then(function (server) {
 
-    var subscription = new Subscription(server, mockLogger(), mockConfig());
+      var subscription = new Subscription(server, mockLogger(), mockConfig());
 
-    subscription.on('message-process-ok', function (data) {
+      subscription.on('message-process-ok', function (data) {
 
-      if (data.message.action == 'subscribe') {
+        if (data.message.action == 'subscribe') {
 
-        expect(data.response).to.eql([ '10.0.0.1:6767' ]);
+          expect(data.response).to.eql(['10.0.0.1:6767']);
 
-        server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'edges', payload: {topic: 'test-topic'}});
-      }
-      else {
+          server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'edges', payload: {topic: 'test-topic'}});
+        }
+        else {
 
-        expect(data.message.action).to.be('edges');
-        expect(data.response).to.eql([ '10.0.0.1:6767' ]);
-        done();
-      }
+          expect(data.message.action).to.be('edges');
+          expect(data.response).to.eql(['10.0.0.1:6767']);
+          done();
+        }
+      });
+
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
     });
-
-    server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
   });
 });

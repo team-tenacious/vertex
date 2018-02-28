@@ -25,7 +25,7 @@ describe('unit - server - server', function () {
       'xxx',
       'yyy',
       'membership',
-      'cache',
+      'subscription-cache',
       'subscription',
       'edge'
     ]);

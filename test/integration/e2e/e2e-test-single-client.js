@@ -57,7 +57,6 @@ describe(filename, function () {
       client.subscribe('/a/test/path', function (data) {
         emitCount++;
       }).then(function (subKey) {
-        console.log('subKey:::',subKey);
         done();
       }).catch(done);
     });
@@ -77,13 +76,12 @@ describe(filename, function () {
 
     client.on('connected', function () {
 
-      client.subscribe('/a/test/path', function (data) {
+      client.subscribe('/a/test/path/1', function (data) {
         done();
       }).then(function (subKey) {
 
-        client.publish('/a/test/path', {some: "data"})
+        client.publish('/a/test/path/1', {some: "data"})
           .then((response) => {
-            console.log('published on:::', response);
           }).catch(done);
 
       }).catch(done);
@@ -107,36 +105,73 @@ describe(filename, function () {
     client.on('connected', function () {
 
       client.on('close', function (info) {
+
         done();
       });
 
-      client.subscribe('/a/test/path', function (data) {
+      client.subscribe('/a/test/path/2', function (data) {
         emitCount++;
       }).then(function (subKey) {
 
-        console.log('subscribed on:::', subKey);
-
-        client.publish('/a/test/path', {some: "data"})
+        client.publish('/a/test/path/2', {some: "data"})
           .then((response) => {
 
-            console.log('published on:::', response);
+            client.unsubscribe(subKey).then((unsubresponse) => {
 
-            client.unsubscribe(subKey).then(function (response) {
-
-              console.log('unsubscribed on:::', response);
-
-              client.publish('/a/test/path', {some: "data"})
+              client.publish('/a/test/path/2', {some: "data"})
                 .then(function (response) {
 
-                  console.log('published again on:::', response);
-
                   setTimeout(() => {
-                    if (emitCount > 1) return done(new Error('unsub failed'));
+                    if (emitCount != 1) return done(new Error('unsub failed'));
                     else client.disconnect({code: 1, reason: 'intentional disconnect test'});
                   }, 5000);
 
                 }).catch(done);
             });
+
+          }).catch(done);
+
+      }).catch(done);
+    });
+
+    client.connect();
+  });
+
+  it('does the client subscribe, publish and unsubscribe - negative', function (done) {
+
+    this.timeout(10000);
+
+    var Client = require('../../..').Client;
+
+    var config = {url: 'ws://localhost:3737'};
+
+    var client = new Client(config);
+
+    var emitCount = 0;
+
+    client.on('connected', function () {
+
+      client.on('close', function (info) {
+
+        done();
+      });
+
+      client.subscribe('/a/test/path/3', function (data) {
+        emitCount++;
+      }).then(function (subKey) {
+
+        client.publish('/a/test/path/3', {some: "data"})
+          .then((response) => {
+
+            client.publish('/a/test/path/3', {some: "data"})
+              .then((response) => {
+
+                setTimeout(() => {
+                  if (emitCount != 2) return done(new Error('unsub failed'));
+                  else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                }, 5000);
+
+              }).catch(done);
 
           }).catch(done);
 

@@ -6,7 +6,7 @@ const EventEmitter = require('events').EventEmitter;
 const SubscriptionCache = require('../../../lib/server/services/subscription-cache');
 const protocol = require('../../../lib/common/protocol').create();
 
-describe.only(filename, function () {
+describe(filename, function () {
 
   async function mockServer() {
 
@@ -26,7 +26,7 @@ describe.only(filename, function () {
 
       return new Promise(function (resolve) {
 
-        if (message.action == 'edges') return resolve(protocol.createReply(message, {response: {edges: ['10:0.0.1:5000', '10:0.0.2:5000']}}));
+        if (message.action == 'edges') return resolve(protocol.createReply(message, {response:  ['10:0.0.1:5000', '10:0.0.2:5000']}));
         resolve('ok');
       })
     };
@@ -125,7 +125,9 @@ describe.only(filename, function () {
         var edge = new Edge(server, mockLogger(), mockConfig());
 
         edge.on('message-process-ok', function (data) {
-          
+
+          console.log('message-process-ok:::', data);
+
           if (data.message.data.action == 'subscribe') {
 
             expect(data.response).to.be('ok');
@@ -136,6 +138,8 @@ describe.only(filename, function () {
             });
           }
           else {
+
+            console.log('data is:::', data);
 
             expect(data.message.data.action).to.be('publish');
             expect(data.response).to.eql({'test-topic': 2, '*': 2});
