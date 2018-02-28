@@ -26,7 +26,7 @@ describe(filename, function () {
 
       return new Promise(function (resolve) {
 
-        if (message.action == 'edges') return resolve(protocol.createReply(message, {response:  ['10:0.0.1:5000', '10:0.0.2:5000']}));
+        if (message.action == 'edges') return resolve(protocol.createReply(message, {response:  ['10:0.0.1:5000', '10:0.0.2:5000'], status:1}));
         resolve('ok');
       })
     };
@@ -126,8 +126,6 @@ describe(filename, function () {
 
         edge.on('message-process-ok', function (data) {
 
-          console.log('message-process-ok:::', data);
-
           if (data.message.data.action == 'subscribe') {
 
             expect(data.response).to.be('ok');
@@ -138,8 +136,6 @@ describe(filename, function () {
             });
           }
           else {
-
-            console.log('data is:::', data);
 
             expect(data.message.data.action).to.be('publish');
             expect(data.response).to.eql({'test-topic': 2, '*': 2});
