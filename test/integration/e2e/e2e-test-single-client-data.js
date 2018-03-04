@@ -59,6 +59,36 @@ describe(filename, function () {
     });
   }
 
+  function checkForClusterSubscriptionData(path, connectionInfo) {
+
+    return new Promise(function (resolve, reject) {
+
+      redis.smembers(path)
+        .then(function (pathMembers) {
+
+          if (pathMembers[0] != connectionInfo.server.address) return reject(new Error('could not find cluster subscription to: ' + path));
+
+          resolve();
+        })
+        .catch(reject);
+    });
+  }
+
+  function checkForNoClusterSubscriptionData(path, connectionInfo) {
+
+    return new Promise(function (resolve, reject) {
+
+      redis.smembers(path)
+        .then(function (pathMembers) {
+
+          if (pathMembers.length > 0) return reject(new Error('cluster subscription should be empty: ' + path));
+
+          resolve();
+        })
+        .catch(reject);
+    });
+  }
+
   function checkForSubscriptionDataRemoved(path, connectionInfo) {
 
     return new Promise(function (resolve, reject) {
@@ -112,6 +142,60 @@ describe(filename, function () {
         .then(() => {
 
           return checkForSubscriptionDataRemoved(testPath, connectionInfo);
+        })
+        .then(done).catch(done);
+    });
+
+    client.connect();
+  });
+
+
+  it('does the client subscribe, then removes edge subscription via external means, does a publish and checks the back pressure unsubscribe has happened', function (done) {
+
+    this.timeout(10000);
+
+    var testPath = '/a/test/subscribe/path/2' + timestamp;
+
+    var Client = require('../../..').Client;
+
+    var config = {url: 'ws://localhost:3737'};
+
+    var client = new Client(config);
+
+    var subscriptionKey;
+
+    client.on('connection-confirmed', function (connectionInfo) {
+
+      client.subscribe(testPath, function (data) {
+
+        })
+        .then(function (subKey) {
+
+          subscriptionKey = subKey;
+
+          return checkForClusterSubscriptionData(testPath, connectionInfo);
+        })
+        .then(() => {
+
+          //externally remove the edge subscription, this should cause back-pressure on the publish event to clean out the cluster subscription
+          return redis.srem('EDGE_SUBSCRIPTION_SESSIONS:' + connectionInfo.server.address + ':' + testPath, connectionInfo.client.sessionId);
+        })
+        .then(() => {
+
+          return client.publish(testPath, {test:'data'});
+        })
+        .then(() => {
+
+          return new Promise((resolve, reject) => {
+
+            // wait a bit to ensure back-pressure request happened TODO: think about a possible race condition if back pressure happens after a legitimate subscribe happens
+            // perhaps all subscription activities must be queued with concurrency 1 on the edge ?
+            setTimeout(function(){
+
+              checkForNoClusterSubscriptionData(testPath, connectionInfo).then(resolve).catch(reject);
+
+            }, 3000);
+          });
         })
         .then(done).catch(done);
     });
