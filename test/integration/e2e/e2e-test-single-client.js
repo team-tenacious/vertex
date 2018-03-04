@@ -180,4 +180,52 @@ describe(filename, function () {
 
     client.connect();
   });
+
+  it('does a client wildcard subscribe, publish and unsubscribe', function (done) {
+
+    this.timeout(10000);
+
+    var Client = require('../../..').Client;
+
+    var config = {url: 'ws://localhost:3737'};
+
+    var client = new Client(config);
+
+    var emitCount = 0;
+
+    client.on('connected', function () {
+
+      client.on('close', function (info) {
+
+        done();
+      });
+
+      client.subscribe('/a/test/wild/path/*', function (data) {
+        emitCount++;
+      }).then(function (subKey) {
+
+        client.publish('/a/test/wild/path/2', {some: "data"})
+          .then(() => {
+
+            client.unsubscribe(subKey).then(() => {
+
+              client.publish('/a/test/wild/path/2', {some: "data"})
+                .then(() => {
+
+                  setTimeout(() => {
+                    if (emitCount != 1) return done(new Error('wildcard sub and unsub failed'));
+                    else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                  }, 5000);
+
+                }).catch(done);
+            });
+
+          }).catch(done);
+
+      }).catch(done);
+    });
+
+    client.connect();
+  });
+
 });
