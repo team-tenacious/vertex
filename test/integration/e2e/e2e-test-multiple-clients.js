@@ -7,9 +7,9 @@ describe(filename, function () {
   var TestCluster = require('../../lib/test-cluster');
   var testCluster = new TestCluster();
 
-  const SERVER_COUNT = 5;
+  const SERVER_COUNT = 20;
 
-  const CLIENT_COUNT = 5;
+  const CLIENT_COUNT = 1000;
 
   var servers;
   var clients;
@@ -58,13 +58,16 @@ describe(filename, function () {
   }
 
   before('initializes the cluster with a config', async() => {
-
+    console.log('starting servers:::');
     servers = await testCluster.startServers(SERVER_COUNT);
+    console.log('started servers:::');
   });
 
   before('initializes multiple clients', async() => {
 
+    console.log('starting clients:::');
     clients = await startClients();
+    console.log('clients started:::');
   });
 
   after('stops clients', () => {
@@ -165,7 +168,7 @@ describe(filename, function () {
 
   it('subscribes all the clients to a wildcard path, then does emits with random clients on a precise path that matches the wildcard pattern, ensures all the clients have the messages in the end', function (done) {
 
-    this.timeout(15000);
+    this.timeout(CLIENT_COUNT * 500 + 10000);
 
     var randomPathKey = Date.now();
 
@@ -183,9 +186,24 @@ describe(filename, function () {
 
     var publishedPaths = [];
 
+    var messageCount = 0;
+
+    var last1000MessagesTimestampPrevious = Date.now();
+
     for (var i = 0; i < CLIENT_COUNT; i++) {
 
       promises.push(clients[i].subscribe(wildcardPath, function(data) {
+
+        messageCount++;
+
+        if (messageCount % 10000 == 0) {
+          var last1000MessagesTimestampNow = Date.now();
+          console.log('messages per ms:::', 10000 / (last1000MessagesTimestampNow - last1000MessagesTimestampPrevious));
+
+          last1000MessagesTimestampPrevious = last1000MessagesTimestampNow;
+
+          console.log('message count:::', messageCount);
+        }
 
         if (!received[this.connectionInfo.client.sessionId]) received[this.connectionInfo.client.sessionId] = {};
 
@@ -213,9 +231,13 @@ describe(filename, function () {
 
             publications = pubs;
 
+            console.log('tallying up:::');
+
             setTimeout(function () {
 
               var notFound = 0;
+
+              var notReceived = 0;
 
               for (let i = 0; i < CLIENT_COUNT; i++) {
 
@@ -230,12 +252,12 @@ describe(filename, function () {
                 }
 
                 publishedPaths.forEach(function(publishedPath){
-
-                  expect(clientReceived[publishedPath]).to.not.be(null);
+                  if (clientReceived[publishedPath] == null) notReceived++;
                 });
               }
 
               if (notFound) return done(new Error('Couldnt find expected publication'));
+              if (notReceived) return done(new Error('Couldnt find expected received publication'));
 
               done();
 
