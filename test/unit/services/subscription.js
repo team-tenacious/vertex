@@ -47,6 +47,9 @@ describe(filename, function () {
     await cache.start();
 
     return {
+      tearDown:function(){
+        this.services['subscription-cache'].stop();
+      },
       services: {
         cluster: cluster,
         ws: ws,
@@ -80,7 +83,8 @@ describe(filename, function () {
       var subscription = new Subscription(server, mockLogger(), mockConfig());
 
       subscription.on('message-process-ok', function (data) {
-        expect(data.response).to.eql(['10.0.0.1:6767']);
+        expect(data.response == 0 || data.response == 1).to.be(true);
+        server.tearDown();
         done();
       });
 
@@ -97,7 +101,7 @@ describe(filename, function () {
       subscription.on('message-process-ok', function (data) {
 
         if (data.message.action == 'subscribe') {
-          expect(data.response).to.eql(['10.0.0.1:6767']);
+          expect(data.response == 0 || data.response == 1).to.be(true);
           server.services.cluster.emit('message', '10.0.0.1:6767', {
             action: 'unsubscribe',
             payload: {topic: 'test-topic'}
@@ -105,7 +109,8 @@ describe(filename, function () {
         }
         else {
           expect(data.message.action).to.be('unsubscribe');
-          expect(data.response).to.eql([]);
+          expect(data.response == 0 || data.response == 1).to.be(true);
+          server.tearDown();
           done();
         }
       });
@@ -124,7 +129,7 @@ describe(filename, function () {
 
         if (data.message.action == 'subscribe') {
 
-          expect(data.response).to.eql(['10.0.0.1:6767']);
+          expect(data.response == 0 || data.response == 1).to.be(true);
 
           server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'edges', payload: {topic: 'test-topic'}});
         }
@@ -132,6 +137,8 @@ describe(filename, function () {
 
           expect(data.message.action).to.be('edges');
           expect(data.response).to.eql(['10.0.0.1:6767']);
+
+          server.tearDown();
           done();
         }
       });

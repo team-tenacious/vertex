@@ -42,6 +42,9 @@ describe(filename, function () {
     await cache.start();
 
     return {
+      tearDown:function(){
+        this.services['subscription-cache'].stop();
+      },
       services: {
         cluster: cluster,
         ws: ws,
@@ -78,6 +81,7 @@ describe(filename, function () {
 
         edge.on('message-process-ok', function (data) {
           expect(data.response).to.be('ok');
+          server.tearDown();
           done();
         });
 
@@ -97,14 +101,19 @@ describe(filename, function () {
         var edge = new Edge(server, mockLogger(), mockConfig());
 
         edge.on('message-process-ok', function (data) {
-          expect(data.response).to.be('ok');
-          if (data.message.data.action == 'subscribe')
+
+          expect(data.response == 'ok' || data.response == 1).to.be(true);
+
+          if (data.message.data.action == 'subscribe') {
             server.services.ws.emit('message', {
               sessionId: 'testId',
               data: {action: 'unsubscribe', payload: {topic: 'test-topic'}}
             });
+          }
           else {
+
             expect(data.message.data.action).to.be('unsubscribe');
+            server.tearDown();
             done();
           }
         });
@@ -139,6 +148,7 @@ describe(filename, function () {
 
             expect(data.message.data.action).to.be('publish');
             expect(data.response).to.eql({'test-topic': 2, '*': 2});
+            server.tearDown();
             done();
           }
         });

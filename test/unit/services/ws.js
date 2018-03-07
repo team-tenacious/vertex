@@ -10,7 +10,7 @@ describe(filename, function () {
   var mockLogger;
   var mockConfig = {};
 
-  before('itinitializes the http service and mocks', function(done){
+  before('initializes the http service and mocks', function(done){
 
     mockLogger = {
       info:function(){},
@@ -18,6 +18,9 @@ describe(filename, function () {
     };
 
     mockServer = {
+      tearDown:async function(){
+        await this.services['http'].stop();
+      },
       services:{}
     };
 
@@ -31,6 +34,11 @@ describe(filename, function () {
       .catch(done);
   });
 
+  after(async ()=> {
+
+    if (mockServer) await mockServer.tearDown();
+  });
+
   it('starts and stops the ws service', function (done) {
 
     var ws = new Ws(mockServer, mockLogger, mockConfig);
@@ -40,6 +48,7 @@ describe(filename, function () {
         return ws.stop();
       })
       .then(function(){
+
         done();
       })
       .catch(done);

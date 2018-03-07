@@ -34,6 +34,8 @@ describe(filename, function () {
 
   after('stops servers', async() => {
 
+    if (redis) redis.disconnect();
+
     await testCluster.stop();
   });
 

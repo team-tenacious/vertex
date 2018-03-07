@@ -72,6 +72,7 @@ describe(filename, function () {
       })
       .then(function (value) {
         expect(value).to.eql([]);
+        cache.stop();
         done();
       })
       .catch(done);
