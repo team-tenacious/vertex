@@ -14,6 +14,8 @@ describe(filename, function () {
   var servers;
   var clients;
 
+  this.timeout(15000);
+
   function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
@@ -58,6 +60,7 @@ describe(filename, function () {
   }
 
   before('initializes the cluster with a config', async() => {
+
     console.log('starting servers:::');
     servers = await testCluster.startServers(SERVER_COUNT);
     console.log('started servers:::');
@@ -188,6 +191,10 @@ describe(filename, function () {
 
     var messageCount = 0;
 
+    var startedEmitting;
+
+    var endedEmitting;
+
     var last1000MessagesTimestampPrevious = Date.now();
 
     for (var i = 0; i < CLIENT_COUNT; i++) {
@@ -209,6 +216,11 @@ describe(filename, function () {
 
         received[this.connectionInfo.client.sessionId][data.topic] = data;
 
+        if (messageCount == CLIENT_COUNT * CLIENT_COUNT) {
+          endedEmitting = Date.now();
+          console.log('completed ' + CLIENT_COUNT * CLIENT_COUNT + ' messages in: ' + (endedEmitting - startedEmitting) / 1000 + ' seconds');
+        }
+
       }.bind(clients[i])));
     }
 
@@ -216,6 +228,8 @@ describe(filename, function () {
       .then(function (subs) {
 
         subscriptions = subs;
+
+        startedEmitting = Date.now();
 
         for (var i = 0; i < CLIENT_COUNT; i++) {
 
@@ -254,6 +268,119 @@ describe(filename, function () {
                 publishedPaths.forEach(function(publishedPath){
                   if (clientReceived[publishedPath] == null) notReceived++;
                 });
+              }
+
+              if (notFound) return done(new Error('Couldnt find expected publication'));
+              if (notReceived) return done(new Error('Couldnt find expected received publication'));
+
+              done();
+
+            }, 3000);
+
+          }).catch(done);
+
+      }).catch(done);
+  });
+
+  it('subscribes all the clients to a precise path, then does emits with random clients on each precise path, ensures all the clients have their messages in the end', function (done) {
+
+    this.timeout(CLIENT_COUNT * 500 + 10000);
+
+    var promises = [];
+
+    var publishPromises = [];
+
+    var received = {};
+
+    var subscriptions;
+
+    var publications;
+
+    var publishedPaths = [];
+
+    var messageCount = 0;
+
+    var startedEmitting;
+
+    var endedEmitting;
+
+    var last1000MessagesTimestampPrevious = Date.now();
+
+    for (var i = 0; i < CLIENT_COUNT; i++) {
+
+      var precisePath = ['precise-all-clients', clients[i].connectionInfo.client.sessionId].join('/');
+
+      promises.push(clients[i].subscribe(precisePath, function(data) {
+
+        messageCount++;
+
+        if (messageCount % 100 == 0) {
+          var last1000MessagesTimestampNow = Date.now();
+          console.log('messages per ms:::', 100 / (last1000MessagesTimestampNow - last1000MessagesTimestampPrevious));
+
+          last1000MessagesTimestampPrevious = last1000MessagesTimestampNow;
+
+          console.log('message count:::', messageCount);
+        }
+
+        if (!received[this.connectionInfo.client.sessionId]) received[this.connectionInfo.client.sessionId] = [];
+
+        received[this.connectionInfo.client.sessionId].push([data]);
+
+        if (messageCount == CLIENT_COUNT) {
+          endedEmitting = Date.now();
+          console.log('completed ' + CLIENT_COUNT + ' messages in: ' + (endedEmitting - startedEmitting) / 1000 + ' seconds');
+        }
+
+      }.bind(clients[i])));
+    }
+
+    Promise.all(promises)
+      .then(function (subs) {
+
+        subscriptions = subs;
+
+        startedEmitting = Date.now();
+
+        for (var i = 0; i < CLIENT_COUNT; i++) {
+
+          var publishPath = ['precise-all-clients', clients[i].connectionInfo.client.sessionId].join('/');
+
+          publishedPaths.push(publishPath);
+
+          var randomClientIndex = Math.floor(Math.random()*CLIENT_COUNT);
+
+          publishPromises.push(clients[randomClientIndex].publish(publishPath, {test:clients[i].connectionInfo.client.sessionId.replace(/\//g, '')}));
+        }
+
+        Promise.all(publishPromises)
+          .then(function (pubs) {
+
+            publications = pubs;
+
+            console.log('tallying up:::');
+
+            setTimeout(function () {
+
+              var notFound = 0;
+
+              var notReceived = 0;
+
+              for (let i = 0; i < CLIENT_COUNT; i++) {
+
+                var client = clients[i];
+
+                var clientReceived = received[client.connectionInfo.client.sessionId];
+
+                if (!clientReceived) {
+                  console.log('not found:::', client.connectionInfo.client.sessionId);
+                  notFound++;
+                  continue;
+                }
+
+                // publishedPaths.forEach(function(publishedPath){
+                //   if (clientReceived[publishedPath] == null) notReceived++;
+                // });
               }
 
               if (notFound) return done(new Error('Couldnt find expected publication'));
