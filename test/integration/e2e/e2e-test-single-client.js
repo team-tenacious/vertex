@@ -29,12 +29,12 @@ describe(filename, function () {
     client.on('connected', function () {
 
       client.on('close', function (info) {
-        expect(info.code).to.be(1);
+        expect(info.code).to.be(1000);
         expect(info.reason).to.be('intentional disconnect test');
         done();
       });
 
-      client.disconnect({code: 1, reason: 'intentional disconnect test'});
+      client.disconnect({code: 1000, reason: 'intentional disconnect test'});
     });
 
     client.connect();
@@ -123,7 +123,7 @@ describe(filename, function () {
 
                   setTimeout(() => {
                     if (emitCount != 1) return done(new Error('unsub failed'));
-                    else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                    else client.disconnect({code: 1000, reason: 'intentional disconnect test'});
                   }, 5000);
 
                 }).catch(done);
@@ -168,7 +168,7 @@ describe(filename, function () {
 
                 setTimeout(() => {
                   if (emitCount != 2) return done(new Error('unsub failed'));
-                  else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                  else client.disconnect({code: 1000, reason: 'intentional disconnect test'});
                 }, 5000);
 
               }).catch(done);
@@ -214,7 +214,7 @@ describe(filename, function () {
 
                   setTimeout(() => {
                     if (emitCount != 1) return done(new Error('wildcard sub and unsub failed'));
-                    else client.disconnect({code: 1, reason: 'intentional disconnect test'});
+                    else client.disconnect({code: 1000, reason: 'intentional disconnect test'});
                   }, 5000);
 
                 }).catch(done);
