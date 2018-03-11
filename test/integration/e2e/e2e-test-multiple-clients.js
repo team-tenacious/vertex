@@ -7,7 +7,7 @@ describe(filename, function () {
   var TestCluster = require('../../lib/test-cluster');
   var testCluster = new TestCluster();
 
-  const SERVER_COUNT = 20;
+  const SERVER_COUNT = 10;
 
   const CLIENT_COUNT = 1000;
 
@@ -169,7 +169,7 @@ describe(filename, function () {
     });
   });
 
-  it('subscribes all the clients to a wildcard path, then does emits with random clients on a precise path that matches the wildcard pattern, ensures all the clients have the messages in the end', function (done) {
+  it.only('subscribes all the clients to a wildcard path, then does emits with random clients on a precise path that matches the wildcard pattern, ensures all the clients have the messages in the end', function (done) {
 
     this.timeout(CLIENT_COUNT * 500 + 10000);
 
