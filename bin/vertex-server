@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+
+var cli = require('cli'), options = cli.parse();
+
+var prompt = require('prompt');
+
+const { Server } = require('../');
+
+const PORT = options.p ? parseInt(options.p) : 3737;
+
+const COMMUNICATIONS_PORT = options.c ? parseInt(options.c) : 60606;
+
+const NAME = options.n ? options.n : require('sillyname')();
+
+const LOG_LEVEL = options.l ? options.l : 'info';
+
+const SECRET = options.s ? options.s : 'vertex';
+
+const SEED = !options.m;
+
+const MEMBERS = options.m? options.m.split(',') : [];
+
+var serverInstance;
+
+prompt.message = '';
+
+prompt.delimiter = '';
+
+prompt.start({noHandleSIGINT: true});
+
+var history = [];
+
+function recordCommandHistory(command){
+    history.push({time:new Date(), command:command});
+}
+
+function printCommandHistory(filter){
+    history.forEach(function(item){
+        if (filter == null || item.command.indexOf(filter) > -1)
+            console.log(item.time.toString() + '    ' + item.command);
+    });
+}
+
+function printHelpOptions(){
+    console.log("'x' to exit");
+    console.log("'hist [filter]' for command history, with optional filter");
+}
+
+function processInput(err, input){
+
+    if (!input) {
+        console.log('unknown instruction, for help enter h, help or ?');
+        return prompt.get(['vertex>'], processInput);
+    }
+
+    var instruction = input['vertex>'];
+
+    var unknownCommand = true;
+
+    if (['stop','exit','end','quit', 'x', 'q'].indexOf(instruction) > -1) return terminate();
+
+    if (['?','h','help'].indexOf(instruction) > -1) {
+        printHelpOptions();
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('hist') == 0) {
+        printCommandHistory(instruction.split(' ')[1]);
+        unknownCommand = false;
+    }
+
+    if (!unknownCommand) recordCommandHistory(instruction);
+    else console.log('unknown command: ' + instruction + ' try ? or help');
+
+    prompt.get(['vertex>'], processInput);
+}
+
+function terminate(opts) {
+
+    console.log('stopping vertex...');
+
+    if (serverInstance)
+        serverInstance.stop()
+        .then(function(){
+          process.exit(0);
+        })
+        .catch(function (err) {
+          console.error(err);
+          process.exit(1);
+        });
+
+    process.exit(0);
+};
+
+var config = {
+   name: NAME,
+   logger: {
+     level: LOG_LEVEL
+   },
+   services: {
+     tcp: {
+       host: '127.0.0.1',
+       port: COMMUNICATIONS_PORT
+     },
+     cluster: {
+       secret: SECRET,
+       seed: SEED,
+       join: MEMBERS
+     },
+     http: {
+       port: PORT
+     }
+   }
+ }
+
+Server.create(config)
+
+    .then(server => {
+
+      serverInstance = server;
+
+      process.on('SIGINT', terminate);
+      process.on('SIGTERM', terminate);
+
+      prompt.get(['vertex>'], processInput);
+    })
+
+    .catch(err => {
+      process.exit(1);
+    });
