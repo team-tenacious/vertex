@@ -6,6 +6,152 @@ Clustered pubsub using hash-ring to distribute load
 ## cluster first
 This is a cluster-first pub-sub solution - so not meant for single instance use, the idea is that we build clustering in from the ground up instead of warping a single-process design to cluster.
 
+## install
+```
+# make sure redis is installed and running
+npm i vertex --save
+# you are good to go
+```
+
+## code example
+
+```javascript
+const { Server, Client } = require(vertex);
+
+var config = {
+   name: 'myTestServerName',//you get a silly name if you leave this out
+   logger: {
+     level: 'info'//info,trace,error
+   },
+   services: {
+     tcp: {
+       host: '127.0.0.1',//bind to local loopback
+       port: 60606//default is 60606, this is the internal tcp port that cluster comms for this node happens on
+     },
+     cluster: {
+       secret: 'myTestClusterSecret',//everyone must know the same secret to join
+       seed: true,//this is the first server we are starting
+       join: ['127.0.0.1:60606','127.0.0.1:60607','127.0.0.1:60608']//list of nodes to rediscover if one is dropped and restarts
+     },
+     http: {
+       port: 3737 //3737 by default - could be port 80, this is what the clients connect to
+     }
+   }
+}
+
+Server.create(config)
+
+    .then(server => {
+
+      var myServerInstance = server;
+      //able to accept client connections to now
+
+      var client = new Client({url: 'ws://localhost:3737'});
+
+      client.on('connection-confirmed', function () {
+
+        client.subscribe('/test/topic/*',
+          function(message){//this is the subscription handler
+
+            //message should be
+            //{
+            //  "topic": "/test/topic/1",
+            //  "data": "test"
+            //}
+
+            client.disconnect({code: 1000, reason: 'intentional disconnect test'});
+          })
+          .then(function(ref){
+            //you can unsubscribe using the ref
+            //client.unsubscribe(ref).then(...)
+
+            client.publish('/test/topic/1', {"test":"data"})
+            .then(function(results){
+              //you have published, data should appear in handler
+            })
+          })
+
+      });
+
+      client.connect();
+    })
+
+    .catch(err => {
+
+    });
+
+```
+
+## cli
+
+```bash
+
+# make sure redis is installed and running
+
+# start 2 servers which form a cluster
+
+git clone
+
+cd vertex
+
+npm i
+
+#STEP 1: start our seed server
+
+> node bin/vertex-server -e true
+
+#NB: client and server cli will show a vertex> prompt
+
+#NB: once in the vertex prompt, client and server help can be show by typing h and enter
+
+#NB: once in the vertex prompt, client and server are stopped and exited by typing x and enter
+
+#STEP 2: open ANOTHER command prompt in same vertex folder location
+
+#start another server, clustered with the seed server
+
+> node bin/vertex-server -c 60607 -p 3738 -m '127.0.0.1:60606'
+
+#NB: for options run node bin/vertex-server -h
+
+#STEP 3: open YET ANOTHER command prompt in same vertex folder location
+
+> node bin/vertex-client
+
+#NB: a client has been started and has joined the cluster via the first default server
+
+#STEP 4: open YET STILL ANOTHER command prompt (you now have 4 windows open) in same vertex folder location
+
+> node bin/vertex-client -e 127.0.0.1:3738
+
+#NB: a client has been started and joined to the cluster via the second started server
+
+#NB: again, for options run node bin/vertex-client -h
+
+#STEP 5: now subscribe the current client to a topic
+
+vertex>sub /test/*
+
+#NB: output looks a bit like this:
+# subscribed to: /test/* ref: OrFHlcY1Rgaaf5qTbwhKQw/0
+
+#STEP 6: switch to the previous client command prompt window (started by running "node bin/vertex-client")
+
+#now publish some data to the topic you subscribed on the other client to
+
+vertex>pub /test/1 test
+
+#STEP 7: switch to other client session and check you received the message:
+received publication: {
+  "topic": "/test/1",
+  "data": "test"
+}
+
+```
+
+## performance
+on an i7 processor mac, with 8 GB RAM running node 9 on a single process (so no benefit of clustering) the tests process a million messages in 20 seconds, so about 50k messages per sec
+
 ## topology
 
 ### top level entities:
@@ -22,279 +168,13 @@ all servers in the cluster have access to the full subscription list, each new s
 What is nice about using the hash-ring instead of random or round robin (which could become a config setting later) - is that each search node will hold an LRU cache for commonly published to addresses, if a hash-ring is used to logically arrange search requests across the cluster, the LRU cache from a cluster perspective, will be less fragmented, if subscription addresses are very random, the hash-ring will distribute requests randomly - so a nice balance.
 
 ## about wildcards
-On publish, the publish addresses are branched into the original address, ie: "/test/1/2" and into the additional wildcard options: "/test/1/*", "/test/*/*", "/*/*/*" - this is done by the search node (not the edge node) - which forwards these search requests to other search nodes identified by the hash ring. These can now be looked up by a key/value store of they are not available in the LRU cache of the search nodes, ie: redis?
+On publish, the publish addresses are branched into the original address, ie: "/test/1/2" and into the additional wildcard options: "/test/1/*", "/test/*/*", "/*/*/*" - this is done by the search node (not the edge node) - which forwards these search requests to other search nodes identified by the hash ring. These can now be looked up by the redis key/value store of they are not available in the LRU cache of the search nodes.
 
 NB: this does mean that / and * are special characters and that /1/* is not the same as /1/*/2
 
-## about subscription lookups
-
-Subscriptions are in a tree structure, with 3 levels:
-
-1. address - the actual subscription path, ie: "/test/1/2"
-2. edge - the address of the edge node the subscription lives on
-3. session - the session id of the client listening for events with stringified subscription options, this is so we can have 2 identical subscriptions that may need to be handled differently because of their options.
-
-The LRU cache and database are keyed by the address of the subscriptions, so the lookup is small for search nodes, edge nodes need only loop through subscriptions in the branch keyed by their own IP and port.
-
-```javascript
-{
-  address:{
-    "/test/1/2":{
-      edge:{
-        "10:0.0.1:6000":{ //edge node address and port
-            session:{
-            "eyJpc3MiOiJzY290Y2:{\"some\":\"option\"}":{ //session id
-              refCount:3 //essentially 
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
 ## about refCounts and subscription ids
 
 Clients perform subscribe requests only once for subscription path and option combinations, following that a local refCount is incremented or decremented depending on subscribe or unsubscribes - when the local refCount reaches zero a cluster unsubscribe message happens. Edge nodes do something similar whereby the subscription record is only broadcasted once consecutive subscribes and unsubscribes are also managed through a refCount which only broadcasts an unsubscribe/subscribe when it is 0 or 1 respectively.
 
-# protocol:
 
-## happy path, login, subscribe, publish
-<img src="https://user-images.githubusercontent.com/1958406/36060561-d8e2c56e-0e54-11e8-918b-12875682ec16.png"></img>
-
-## statuses
-```javascript
-const statuses = {
-  action:{
-      ok:1,
-      failed:2
-  }
-}
-```
-
-# messages:
-
-## authenticate:
-
-```javascript
-var authenticatePacket = {
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11418", //client generated tx id, so client is able to match up replies
-  "time": 1518248771817, //client generated timestamp
-  "action": "authenticate", //message type
-  "options":{ //action options - to change possible behaviour
-    "type":"basic"
-  },
-  "payload":{ //in a non-secured system this could be null
-    "user":"test",
-    "password":"password",
-    "publicKey":"[keypair used to decrypt re-establish token]"
-  }
-}
-```
-
-## authenticate ack
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
-  "time": 1518248991817,
-  "action": "authenticate-ack",
-  "payload":{
-    "status": 1,
-    "sessionId":"eyJpc3MiOiJzY290Y2",
-    "token": "eyJpc3MiOiJzY290Y2guaW8iLCJleHAiOjEzMDA4MTkzODAsIm5hbWUiOiJDaHJpcyBTZXZpbGxlamEiLCJhZG1pbiI6dHJ1ZX0"
-  }
-}
-```
-## subscribe
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
-  "time": 1518248991817,
-  "action": "subscribe",
-  "options":{
-    "action":"*"
-  },
-  "payload":{
-    "sessionId":"eyJpc3MiOiJzY290Y2",
-    "address": "/test/*/*"
-  }
-}
-```
-
-## subscribe broadcast
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11400",
-  "time": 151824911817,
-  "action": "broadcast",
-  "options":{},
-  "payload":{
-    "edge": "[this edge node address]",
-    "subscription":{
-      "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
-      "time": 1518248991817,
-      "action": "subscribe",
-      "options":{
-        "action":"*"
-      },
-      "payload":{
-        "sessionId":"eyJpc3MiOiJzY290Y2",
-        "address": "/test/*/*"
-      }
-    }
-  }
-}
-```
-
-## subscribe broadcast ack
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11400",
-  "time": 151824911817,
-  "action": "broadcast-ack",
-  "options": {},
-  "payload":{
-    "status": 1
-  }
-}
-```
-
-## subscribe ack
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c11418",
-  "time": 1518248991817,
-  "action": "subscribe-ack",
-  "payload":{
-    "status": 1
-  }
-}
-```
-
-## publish
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112222",
-  "time": 1518248991899,
-  "action": "publish",
-  "options":{
-    "merge":true
-  },
-  "payload":{
-    "address": "/test/1/2",
-    "data":{
-      "test":"data"
-    }
-  }
-}
-```
-
-## publish forward
-*goes to edge node looked up in the subscriptions table*
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112223",
-  "time": 1518248991900,
-  "action": "publish-forward",
-  "options":{},
-  "payload":{
-    "publication":{
-      "tx": "049b7020-c787-41bf-a1d2-a97612c112222",
-      "time": 1518248991899,
-      "action": "publish",
-      "options":{
-        "merge":true
-      },
-      "payload":{
-        "address": "/test/1/2",
-        "data":{
-          "test":"data"
-        }
-      }
-    }
-  }
-}
-```
-
-## publish forward ack
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112223",
-  "time": 1518248991900,
-  "action": "publish-forward-ack",
-  "options":{},
-  "payload":{
-    "status":1
-  }
-}
-```
-
-## publish ack
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112222",
-  "time": 1518248991999,
-  "action": "publish-ack",
-  "payload":{
-    "status":1
-  }
-}
-```
-
-## notify forward
-*sent to the edge node from the node that checks the subscriptions for edge nodes that house subscriber sessions relevant to the path, note - no sessionId here, the edge node looks for matching sessions and forwards the notifications, not the address and subscription fields, address is the published on path, subscription is how the edge node was found (so may be a wildcard path)*
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112224",
-  "time": 1518249991900,
-  "action": "notify-forward",
-  "options":{},
-  "payload":{
-    "tx": "049b7020-c787-41bf-a1d2-a97612c112222",
-    "time": 1518248991899,
-    "action": "publish",
-    "options":{
-      "merge":true
-    },
-    "payload":{
-      "address": "/test/1/2",
-      "subscription": "/test/*/*",
-      "data":{
-        "test":"data"
-      }
-    }
-  }
-}
-```
-
-## notify
-*sent from the edge node to the client which has a session subscribed to the path, note address and subscription fields*
-
-```json
-{
-  "tx": "049b7020-c787-41bf-a1d2-a97612c112224",
-  "time": 1518249991900,
-  "action": "notify",
-  "payload":{
-    "address": "/test/1/2",
-    "subscription": "/test/*/*",
-    "data":{
-      "test":"data"
-    }
-  }
-}
-```
-
-# how data could be shared
-
-If we use redis as the central db for subscriptions, our edge nodes could become the database updaters - so they essentially push changes to the subscription tree as necessary, after the change is written to the db a broadcast happens cluster wide that causes search nodes to update their caches, this is a nice performant flow that prevents the database getting locked or having concurrency issues because everyone is updating the db on broadcast.
 

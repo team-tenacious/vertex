@@ -1,0 +1,166 @@
+#!/usr/bin/env node
+
+var cli = require('cli'), options = cli.parse({
+    name: [ 'n', 'the name of the instance', 'string' ],
+    seed: [ 'e', 'this is the first seed node' ],
+    port: [ 'p', 'the ws port to listen for client connections on', 'int'],
+    communications_port: [ 'c', 'the ws port to listen for client connections on', 'int'],
+    log_level: [ 'l', 'log level, can be trace, info, error', 'string'],
+    secret: [ 's', 'cluster membership secret', 'string'],
+    members: ['m', 'comma separated list of members', 'string']
+});
+
+var prompt = require('prompt');
+
+const { Server } = require('../');
+
+const PORT = options.port || 3737;
+
+const COMMUNICATIONS_PORT = options.communications_port || 60606;
+
+const NAME = options.name || require('sillyname')();
+
+const LOG_LEVEL = options.log_level || 'info';
+
+const SECRET = options.secret || 'vertex';
+
+const SEED = options.seed == "true" || options.seed == 1;
+
+const MEMBERS = options.members ? options.members.split(',') : [];
+
+var serverInstance;
+
+prompt.message = '';
+
+prompt.delimiter = '';
+
+prompt.start({noHandleSIGINT: true});
+
+var history = [];
+
+function recordCommandHistory(command){
+    history.push({time:new Date(), command:command});
+}
+
+function printMembers(filter){
+
+    serverInstance.services.cluster.listPeers().forEach(function(peer){
+
+        if (filter == null || peer.indexOf(filter) > -1)
+            console.log(peer);
+    });
+}
+
+function printClients(filter){
+
+    serverInstance.services.ws.listClients().forEach(function(client){
+
+        if (filter == null || client.sessionId.indexOf(filter) > -1)
+            console.log(client.sessionId);
+    });
+}
+
+function printCommandHistory(filter){
+    history.forEach(function(item){
+        if (filter == null || item.command.indexOf(filter) > -1)
+            console.log(item.time.toString() + '    ' + item.command);
+    });
+}
+
+function printHelpOptions(){
+    console.log("'x' to exit");
+    console.log("'hist [filter]' for command history, with optional filter");
+    console.log("'members [filter]' for a list of cluster members, with optional contains filter");
+    console.log("'clients [filter]' for a list of clients currently connected to this instance, with optional contains filter on sessionId");
+}
+
+function processInput(err, input){
+
+    if (!input) {
+        console.log('unknown instruction, for help enter h, help or ?');
+        return prompt.get(['vertex>'], processInput);
+    }
+
+    var instruction = input['vertex>'];
+
+    var unknownCommand = true;
+
+    if (['stop','exit','end','quit', 'x', 'q'].indexOf(instruction) > -1) return terminate();
+
+    if (['?','h','help'].indexOf(instruction) > -1) {
+        printHelpOptions();
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('hist') == 0) {
+        printCommandHistory(instruction.split(' ')[1]);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('members') == 0) {
+        printMembers(instruction.split(' ')[1]);
+        unknownCommand = false;
+    }
+
+     if (instruction.indexOf('clients') == 0) {
+            printClients(instruction.split(' ')[1]);
+            unknownCommand = false;
+        }
+
+    if (!unknownCommand) recordCommandHistory(instruction);
+    else console.log('unknown command: ' + instruction + ' try ? or help or x for exit');
+
+    prompt.get(['vertex>'], processInput);
+}
+
+function terminate(opts) {
+
+    if (serverInstance)
+        serverInstance.stop()
+        .then(function(){
+          process.exit(0);
+        })
+        .catch(function (err) {
+          console.error(err);
+          process.exit(1);
+        });
+
+    process.exit(0);
+};
+
+var config = {
+   name: NAME,
+   logger: {
+     level: LOG_LEVEL
+   },
+   services: {
+     tcp: {
+       host: '127.0.0.1',
+       port: COMMUNICATIONS_PORT
+     },
+     cluster: {
+       secret: SECRET,
+       seed: SEED,
+       join: MEMBERS
+     },
+     http: {
+       port: PORT
+     }
+   }
+ }
+
+Server.create(config)
+
+    .then(server => {
+
+      serverInstance = server;
+
+      process.on('SIGINT', terminate);
+      process.on('SIGTERM', terminate);
+
+      prompt.get(['vertex>'], processInput);
+    })
+
+    .catch(err => {
+      process.exit(1);
+    });

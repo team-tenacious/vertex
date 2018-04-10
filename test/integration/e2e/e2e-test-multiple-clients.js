@@ -169,7 +169,7 @@ describe(filename, function () {
     });
   });
 
-  it.only('subscribes all the clients to a wildcard path, then does emits with random clients on a precise path that matches the wildcard pattern, ensures all the clients have the messages in the end', function (done) {
+  it('subscribes all the clients to a wildcard path, then does emits with random clients on a precise path that matches the wildcard pattern, ensures all the clients have the messages in the end', function (done) {
 
     this.timeout(CLIENT_COUNT * 500 + 10000);
 

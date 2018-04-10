@@ -1,10 +1,11 @@
 {
   "name": "vertex",
   "description": "distributed pub/sub using hash rings",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "main": "./lib/index",
   "scripts": {
-    "test": "LOG_LEVEL=error mocha test/integration/* test/unit/*"
+    "test": "LOG_LEVEL=error mocha test/integration/* test/unit/*",
+    "test-release": "rm -rf node_modules && rm -f package-lock.json && npm install && LOG_LEVEL=error mocha test/integration/* test/unit/*"
   },
   "author": "Tenacious and NSOFT",
   "license": "MIT",
@@ -18,6 +19,7 @@
   },
   "dependencies": {
     "async": "^2.6.0",
+    "cli": "^1.0.1",
     "dag-map": "^2.0.2",
     "express": "^4.16.2",
     "hashring": "^3.2.0",
@@ -25,7 +27,9 @@
     "ioredis": "^3.2.2",
     "json-socket": "^0.3.0",
     "lru-cache": "^4.1.1",
+    "prompt": "^1.0.0",
     "shortid": "^2.2.8",
+    "sillyname": "^0.1.0",
     "uws": "^9.14.0",
     "vertex-logger": "^2.3.2",
     "vertex-names": "^1.1.4",

@@ -83,12 +83,13 @@ describe(filename, function () {
       var subscription = new Subscription(server, mockLogger(), mockConfig());
 
       subscription.on('message-process-ok', function (data) {
+
         expect(data.response == 0 || data.response == 1).to.be(true);
         server.tearDown();
         done();
       });
 
-      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'cluster-subscribe', payload: {topic: 'test-topic'}});
     });
   });
 
@@ -100,22 +101,22 @@ describe(filename, function () {
 
       subscription.on('message-process-ok', function (data) {
 
-        if (data.message.action == 'subscribe') {
+        if (data.message.action == 'cluster-subscribe') {
           expect(data.response == 0 || data.response == 1).to.be(true);
           server.services.cluster.emit('message', '10.0.0.1:6767', {
-            action: 'unsubscribe',
+            action: 'cluster-unsubscribe',
             payload: {topic: 'test-topic'}
           });
         }
         else {
-          expect(data.message.action).to.be('unsubscribe');
+          expect(data.message.action).to.be('cluster-unsubscribe');
           expect(data.response == 0 || data.response == 1).to.be(true);
           server.tearDown();
           done();
         }
       });
 
-      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'cluster-subscribe', payload: {topic: 'test-topic'}});
     });
   });
 
@@ -127,7 +128,7 @@ describe(filename, function () {
 
       subscription.on('message-process-ok', function (data) {
 
-        if (data.message.action == 'subscribe') {
+        if (data.message.action == 'cluster-subscribe') {
 
           expect(data.response == 0 || data.response == 1).to.be(true);
 
@@ -143,7 +144,7 @@ describe(filename, function () {
         }
       });
 
-      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'subscribe', payload: {topic: 'test-topic'}});
+      server.services.cluster.emit('message', '10.0.0.1:6767', {action: 'cluster-subscribe', payload: {topic: 'test-topic'}});
     });
   });
 });

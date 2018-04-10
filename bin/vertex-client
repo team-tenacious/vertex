@@ -1,0 +1,228 @@
+#!/usr/bin/env node
+
+var cli = require('cli'), options = cli.parse({
+    edge: [ 'e', 'the ip:port of the cluster member the client must connect to', 'string' ]
+});
+
+var prompt = require('prompt');
+
+const EDGE = options.edge || '127.0.0.1:3737';
+
+var clientInstance;
+
+prompt.message = '';
+
+prompt.delimiter = '';
+
+prompt.start({noHandleSIGINT: true});
+
+var history = [];
+
+var subscriptions = {};
+
+function processInput(err, input){
+
+    if (!input) {
+        console.log('unknown instruction, for help enter h, help or ?');
+        return prompt.get(['vertex>'], processInput);
+    }
+
+    var instruction = input['vertex>'];
+
+    var unknownCommand = true;
+
+    if (['stop','exit','end','quit', 'x', 'q'].indexOf(instruction) > -1) return terminate();
+
+    if (['?','h','help'].indexOf(instruction) > -1) {
+        printHelpOptions();
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('hist') == 0) {
+        printCommandHistory(instruction.split(' ')[1]);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('sub') == 0) {
+        subscribe(instruction);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('runsub') == 0) {
+        unsubscribeRef(instruction);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('unsub') == 0) {
+        unsubscribe(instruction);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('pub') == 0) {
+        publish(instruction);
+        unknownCommand = false;
+    }
+
+    if (instruction.indexOf('jpub') == 0) {
+        publishJson(instruction);
+        unknownCommand = false;
+    }
+
+    if (!unknownCommand) recordCommandHistory(instruction);
+    else message('unknown command: ' + instruction + ' try ? or help or x for exit');
+}
+
+function message(text){
+    console.log(text);
+    prompt.get(['vertex>'], processInput);
+}
+
+function recordCommandHistory(command){
+    history.push({time:new Date(), command:command});
+}
+
+function printCommandHistory(filter){
+    history.forEach(function(item){
+        if (filter == null || item.command.indexOf(filter) > -1)
+            message(item.time.toString() + '    ' + item.command);
+    });
+}
+
+function printHelpOptions(){
+    console.log("'x' to exit");
+    console.log("'hist [filter]' for command history, with optional filter");
+    console.log("'sub [topic]' to subscribe to a topic, the topic is mandatory, ie: sub /test/topic/*");
+    console.log("'unsub [ref]' to unsubscribe from a subscription reference");
+    console.log("'pub [topic] [value]' to publish to a topic, the topic and value are mandatory, ie: pub /test/topic testValue");
+    console.log("'jpub [topic] [json]' to publish json to a topic, the topic and value are mandatory, ie: pub /test/topic {test:'json'}");
+
+    message('');
+}
+
+function printPublication(data){
+
+    console.log('received publication: ' + JSON.stringify(data, null, 2));
+}
+
+function subscribe(instruction){
+
+    if (!clientInstance) return message('client not connected...');
+
+    var params = instruction.split(' ');
+    var topic = params[1];
+
+    if (!topic) return message('topic cannot be null');
+
+    clientInstance.subscribe(topic, printPublication)
+    .then(function(ref){
+        subscriptions[ref.tx] = ref;
+        message('subscribed to: ' + topic + ' ref: ' + ref.tx);
+    })
+    .catch(function(e){
+        message('failed to subscribe to ' + topic + ': ' + e.toString());
+    });
+}
+
+function unsubscribe(instruction){
+
+    if (!clientInstance) return message('client not connected...');
+
+    var params = instruction.split(' ');
+
+    var ref = params[1];
+
+    if (!ref) return message('ref cannot be null');
+
+    if (!subscriptions[ref]) return message('no subscription for this ref found');
+
+    var ref = subscriptions[ref];
+
+    clientInstance.unsubscribe(ref)
+    .then(function(){
+        delete subscriptions[ref.tx];
+        message('unsubscribed from topic: ' + ref.payload.topic + ', ref: ' + ref.tx);
+    })
+    .catch(function(e){
+        message('failed to unsubscribe from topic' + ref.payload.topic + ' using ref: ' + ref.tx + ': ' + e.toString());
+    });
+}
+
+function publish(instruction){
+
+    if (!clientInstance) return message('client not connected...');
+
+    var params = instruction.split(' ');
+
+    var topic = params[1];
+
+    var publishMessage = params[2];
+
+    if (!topic) return message('topic cannot be null...');
+
+    if (!publishMessage) return message('message cannot be null...');
+
+    clientInstance.publish(topic, publishMessage)
+    .then(function(){
+        message('published to topic ' + topic + ' ok');
+    })
+    .catch(function(e){
+        message('failed to publish to ' + topic + ': ' + e.toString());
+    });
+}
+
+function publishJson(instruction){
+
+    if (!clientInstance) return message('client not connected...');
+
+        var params = instruction.split(' ');
+
+        var topic = params[1];
+
+        var publishMessage = params[2];
+
+        if (!topic) return message('topic cannot be null...');
+
+        if (!publishMessage) return message('message cannot be null...');
+
+        var jsonMessage;
+
+        try{
+            jsonMessage = JSON.parse(publishMessage);
+        }catch(e){
+            return message('message in bad json format: ' + publishMessage);
+        }
+
+        clientInstance.publish(topic, jsonMessage)
+        .then(function(result){
+            message('published to topic ' + topic + ' ok');
+        })
+        .catch(function(e){
+            message('failed to publish to ' + topic + ': ' + e.toString());
+        });
+}
+
+function terminate(opts) {
+
+    if (clientInstance)clientInstance.disconnect();
+    process.exit(0);
+};
+
+var Client = require('../').Client;
+
+var config = {url: 'ws://' + EDGE};
+
+var client = new Client(config);
+
+client.on('connection-confirmed', function (data) {
+    clientInstance = client;
+    console.log('connected to: ' + EDGE + ', name: ' + data.server.name);
+    message('session id: ' + data.client.sessionId);
+});
+
+client.on('error', function (e) {
+    console.log('error happened in client:::', e.toString());
+    process.exit(1);
+});
+
+client.connect();
+
