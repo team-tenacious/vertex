@@ -1,5 +1,5 @@
 # vertex
-Clustered pubsub using hash-ring to distribute load
+Clustered pubsub using hash-ring to distribute load and redis to store subscriptions
 
 # premise
 
@@ -86,13 +86,13 @@ Server.create(config)
 
 ```bash
 
+#STEP 0: get vertex installed, check for redis
+
 # make sure redis is installed and running
 
 # start 2 servers which form a cluster
 
-git clone
-
-cd vertex
+git clone https://github.com/team-tenacious/vertex.git && cd vertex
 
 npm i
 
