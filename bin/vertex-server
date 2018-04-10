@@ -1,24 +1,32 @@
 #!/usr/bin/env node
 
-var cli = require('cli'), options = cli.parse();
+var cli = require('cli'), options = cli.parse({
+    name: [ 'n', 'the name of the instance', 'string' ],
+    seed: [ 'e', 'this is the first seed node' ],
+    port: [ 'p', 'the ws port to listen for client connections on', 'int'],
+    communications_port: [ 'c', 'the ws port to listen for client connections on', 'int'],
+    log_level: [ 'l', 'log level, can be trace, info, error', 'string'],
+    secret: [ 's', 'cluster membership secret', 'string'],
+    members: ['m', 'comma separated list of members', 'string']
+});
 
 var prompt = require('prompt');
 
 const { Server } = require('../');
 
-const PORT = options.p ? parseInt(options.p) : 3737;
+const PORT = options.port || 3737;
 
-const COMMUNICATIONS_PORT = options.c ? parseInt(options.c) : 60606;
+const COMMUNICATIONS_PORT = options.communications_port || 60606;
 
-const NAME = options.n ? options.n : require('sillyname')();
+const NAME = options.name || require('sillyname')();
 
-const LOG_LEVEL = options.l ? options.l : 'info';
+const LOG_LEVEL = options.log_level || 'info';
 
-const SECRET = options.s ? options.s : 'vertex';
+const SECRET = options.secret || 'vertex';
 
-const SEED = !options.m;
+const SEED = options.seed == "true" || options.seed == 1;
 
-const MEMBERS = options.m? options.m.split(',') : [];
+const MEMBERS = options.members ? options.members.split(',') : [];
 
 var serverInstance;
 
@@ -34,6 +42,24 @@ function recordCommandHistory(command){
     history.push({time:new Date(), command:command});
 }
 
+function printMembers(filter){
+
+    serverInstance.services.cluster.listPeers().forEach(function(peer){
+
+        if (filter == null || peer.indexOf(filter) > -1)
+            console.log(peer);
+    });
+}
+
+function printClients(filter){
+
+    serverInstance.services.ws.listClients().forEach(function(client){
+
+        if (filter == null || client.sessionId.indexOf(filter) > -1)
+            console.log(client.sessionId);
+    });
+}
+
 function printCommandHistory(filter){
     history.forEach(function(item){
         if (filter == null || item.command.indexOf(filter) > -1)
@@ -44,6 +70,8 @@ function printCommandHistory(filter){
 function printHelpOptions(){
     console.log("'x' to exit");
     console.log("'hist [filter]' for command history, with optional filter");
+    console.log("'members [filter]' for a list of cluster members, with optional contains filter");
+    console.log("'clients [filter]' for a list of clients currently connected to this instance, with optional contains filter on sessionId");
 }
 
 function processInput(err, input){
@@ -69,15 +97,23 @@ function processInput(err, input){
         unknownCommand = false;
     }
 
+    if (instruction.indexOf('members') == 0) {
+        printMembers(instruction.split(' ')[1]);
+        unknownCommand = false;
+    }
+
+     if (instruction.indexOf('clients') == 0) {
+            printClients(instruction.split(' ')[1]);
+            unknownCommand = false;
+        }
+
     if (!unknownCommand) recordCommandHistory(instruction);
-    else console.log('unknown command: ' + instruction + ' try ? or help');
+    else console.log('unknown command: ' + instruction + ' try ? or help or x for exit');
 
     prompt.get(['vertex>'], processInput);
 }
 
 function terminate(opts) {
-
-    console.log('stopping vertex...');
 
     if (serverInstance)
         serverInstance.stop()

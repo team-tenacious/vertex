@@ -1,10 +1,11 @@
 {
   "name": "vertex",
   "description": "distributed pub/sub using hash rings",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "main": "./lib/index",
   "scripts": {
-    "test": "LOG_LEVEL=error mocha test/integration/* test/unit/*"
+    "test": "LOG_LEVEL=error mocha test/integration/* test/unit/*",
+    "test-release": "rm -rf node_modules && rm -f package-lock.json && npm install && LOG_LEVEL=error mocha test/integration/* test/unit/*"
   },
   "author": "Tenacious and NSOFT",
   "license": "MIT",
